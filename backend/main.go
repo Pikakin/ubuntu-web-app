@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -26,7 +25,6 @@ func main() {
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
-		ExposeHeaders:    []string{"Content-Length"},
 	}))
 
 	// 認証関連
@@ -36,9 +34,23 @@ func main() {
 	authorized := r.Group("/api")
 	authorized.Use(handlers.AuthMiddleware())
 	{
+		// システム関連
 		authorized.GET("/system/info", handlers.GetSystemInfo)
 		authorized.POST("/system/execute", handlers.ExecuteCommand)
-		authorized.GET("/files", handlers.ListFiles)
+		
+		// サービス関連
+		authorized.GET("/services", handlers.ListServices)
+		authorized.GET("/services/:service", handlers.GetServiceStatus)
+		authorized.POST("/services/control", handlers.ControlService)
+		
+		// ファイル関連
+		authorized.GET("/files", handlers.GetFileList)
+		authorized.GET("/files/content", handlers.GetFileContent)
+		authorized.POST("/files/content", handlers.SaveFileContent)
+		authorized.POST("/files/directory", handlers.CreateDirectory)
+		authorized.DELETE("/files", handlers.DeleteFile)
+		
+		// WebSocket
 		authorized.GET("/ws", handleWebSocket)
 	}
 
@@ -55,22 +67,6 @@ func main() {
 }
 
 func handleWebSocket(c *gin.Context) {
-	// WebSocketの認証トークンをクエリパラメータから取得
-	token := c.Query("token")
-	if token == "" {
-		// ヘッダーからも確認
-		authHeader := c.GetHeader("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			token = strings.TrimPrefix(authHeader, "Bearer ")
-		}
-	}
-
-	// トークンの検証（実際の実装ではJWTの検証を行う）
-	if token == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println("WebSocket upgrade error:", err)

@@ -36,7 +36,10 @@ export const fetchSystemInfo = async (): Promise<string> => {
         Authorization: token ? `Bearer ${token}` : ''
       }
     });
-    return response.data.info;
+    
+    // レスポンスの形式に合わせて整形
+    const { hostname, kernel, os } = response.data;
+    return `Hostname: ${hostname}\nKernel: ${kernel}\nOS: ${os}`;
   } catch (error) {
     console.error('Error fetching system info:', error);
     throw error;
@@ -63,6 +66,58 @@ export const executeCommand = async (command: string): Promise<string> => {
   }
 };
 
+// サービス一覧を取得
+export const getServices = async () => {
+  try {
+    const token = getAuthToken();
+    const response = await axios.get(`${API_BASE_URL}/services`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : ''
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error getting services:', error);
+    throw error;
+  }
+};
+
+// サービスの状態を取得
+export const getServiceStatus = async (service: string) => {
+  try {
+    const token = getAuthToken();
+    const response = await axios.get(`${API_BASE_URL}/services/${service}`, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : ''
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error getting service status:', error);
+    throw error;
+  }
+};
+
+// サービスを制御（開始、停止、再起動）
+export const controlService = async (service: string, action: 'start' | 'stop' | 'restart') => {
+  try {
+    const token = getAuthToken();
+    const response = await axios.post(
+      `${API_BASE_URL}/services/control`,
+      { service, action },
+      {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : ''
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error controlling service:', error);
+    throw error;
+  }
+};
+
 // WebSocketコネクションを確立
 export const connectWebSocket = (): WebSocket => {
   const token = getAuthToken();
@@ -81,4 +136,95 @@ export const connectWebSocket = (): WebSocket => {
   };
   
   return ws;
+};
+
+// ファイル一覧を取得
+export const getFileList = async (path: string) => {
+  try {
+    const token = getAuthToken();
+    const response = await axios.get(`${API_BASE_URL}/files`, {
+      params: { path },
+      headers: {
+        Authorization: token ? `Bearer ${token}` : ''
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error getting file list:', error);
+    throw error;
+  }
+};
+
+// ファイル内容を取得
+export const getFileContent = async (path: string) => {
+  try {
+    const token = getAuthToken();
+    const response = await axios.get(`${API_BASE_URL}/files/content`, {
+      params: { path },
+      headers: {
+        Authorization: token ? `Bearer ${token}` : ''
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error getting file content:', error);
+    throw error;
+  }
+};
+
+// ディレクトリを作成
+export const createDirectory = async (path: string, name: string) => {
+  try {
+    const token = getAuthToken();
+    const response = await axios.post(
+      `${API_BASE_URL}/files/directory`, 
+      { path, name },
+      {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : ''
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error creating directory:', error);
+    throw error;
+  }
+};
+
+// ファイルまたはディレクトリを削除
+export const deleteFile = async (path: string) => {
+  try {
+    const token = getAuthToken();
+    const response = await axios.delete(`${API_BASE_URL}/files`, {
+      params: { path },
+      headers: {
+        Authorization: token ? `Bearer ${token}` : ''
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    throw error;
+  }
+};
+
+// ファイル内容を保存
+export const saveFileContent = async (path: string, content: string) => {
+  try {
+    const token = getAuthToken();
+    const response = await axios.post(
+      `${API_BASE_URL}/files/content`, 
+      { path, content },
+      {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : ''
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error saving file content:', error);
+    throw error;
+  }
 };

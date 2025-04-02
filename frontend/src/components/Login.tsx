@@ -1,8 +1,10 @@
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { 
+  Alert,
   Avatar,
   Box, 
   Button, 
+  CircularProgress,
   Container,
   Paper, 
   TextField, 
@@ -10,8 +12,8 @@ import {
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { login } from '../services/api';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const LoginContainer = styled(Box)(({ theme }) => ({
   height: '100vh',
@@ -36,39 +38,23 @@ const LoginForm = styled(Paper)(({ theme }) => ({
   width: '100%',
 }));
 
-interface LoginProps {
-  onLogin: (success: boolean) => void;
-}
-
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { login, isAuthenticated, loading, error } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    
-    try {
-      // APIを使用して実際のバックエンドで認証
-      const success = await login(username, password);
-      
-      if (success) {
-        onLogin(true); // この行が重要
-        navigate('/'); // ルートパスに遷移
-      } else {
-        setError('Invalid username or password');
-      }
-    } catch (err) {
-      setError('Login failed. Please try again.');
-      console.error('Login error:', err);
-    } finally {
-      setLoading(false);
+    const success = await login(username, password);
+    if (success) {
+      navigate('/');
     }
   };
+
+  if (isAuthenticated) {
+    return <Navigate to="/" />;
+  }
 
   return (
     <LoginContainer>
@@ -83,9 +69,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           
           <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
             {error && (
-              <Typography color="error" align="center" sx={{ mb: 2 }}>
+              <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
-              </Typography>
+              </Alert>
             )}
             
             <TextField
@@ -123,7 +109,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               sx={{ mt: 3, mb: 2 }}
               disabled={loading}
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? <CircularProgress size={24} /> : 'Sign In'}
             </Button>
             
             <Typography variant="body2" color="text.secondary" align="center">

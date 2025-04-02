@@ -1,43 +1,59 @@
 import CloseIcon from '@mui/icons-material/Close';
-import CropSquareIcon from '@mui/icons-material/CropSquare';
 import MinimizeIcon from '@mui/icons-material/Minimize';
-import { Box, Divider, IconButton, Paper, Typography } from '@mui/material';
+import OpenInFullIcon from '@mui/icons-material/OpenInFull';
+import { Box, IconButton, Paper, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React, { useState, useRef, useEffect } from 'react';
+import Draggable, { DraggableProps } from 'react-draggable';
+import { Resizable } from 'react-resizable';
+import 'react-resizable/css/styles.css';
 
-const WindowContainer = styled(Paper)<{ isActive: boolean; position: { x: number; y: number } }>(
-  ({ theme, isActive, position }) => ({
-    position: 'absolute',
-    top: position.y,
-    left: position.x,
-    minWidth: 400,
-    minHeight: 300,
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: isActive
-      ? '0 10px 25px rgba(0, 0, 0, 0.2)'
-      : '0 4px 10px rgba(0, 0, 0, 0.1)',
-    border: `1px solid ${isActive ? theme.palette.primary.main : 'rgba(0, 0, 0, 0.1)'}`,
-    borderRadius: 8,
-    overflow: 'hidden',
-    zIndex: isActive ? 100 : 10,
-    resize: 'both',
-  })
-);
+const WindowContainer = styled(Paper, {
+  shouldForwardProp: (prop) => prop !== 'isActive' && prop !== 'isMaximized'
+})<{ isActive: boolean; isMaximized: boolean }>(({ theme, isActive, isMaximized }) => ({
+  position: 'absolute',
+  display: 'flex',
+  flexDirection: 'column',
+  boxShadow: isActive 
+    ? '0 10px 25px rgba(0, 0, 0, 0.3)' 
+    : '0 5px 15px rgba(0, 0, 0, 0.1)',
+  border: isActive 
+    ? `1px solid ${theme.palette.primary.main}` 
+    : '1px solid rgba(0, 0, 0, 0.1)',
+  borderRadius: 4,
+  overflow: 'hidden',
+  zIndex: isActive ? 100 : 10,
+  ...(isMaximized && {
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 48, // タスクバーの高さ
+    width: '100%',
+    height: 'calc(100vh - 48px)',
+    transform: 'none !important',
+  }),
+  ...(isMaximized === false && {
+    width: 800,
+    height: 600,
+  }),
+}));
 
-const WindowTitleBar = styled(Box)<{ isActive: boolean }>(({ theme, isActive }) => ({
-  padding: theme.spacing(0.5, 1),
-  backgroundColor: isActive ? theme.palette.primary.main : theme.palette.grey[300],
-  color: isActive ? theme.palette.primary.contrastText : theme.palette.text.primary,
+const WindowTitleBar = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'isActive'
+})<{ isActive: boolean }>(({ theme, isActive }) => ({
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
+  padding: '4px 8px',
+  backgroundColor: isActive 
+    ? theme.palette.primary.main 
+    : theme.palette.grey[300],
+  color: isActive ? theme.palette.primary.contrastText : theme.palette.text.primary,
   cursor: 'move',
+  userSelect: 'none',
 }));
 
 const WindowContent = styled(Box)(({ theme }) => ({
   flexGrow: 1,
-  padding: theme.spacing(2),
   overflow: 'auto',
   backgroundColor: theme.palette.background.paper,
 }));
@@ -51,76 +67,98 @@ interface WindowProps {
   onFocus: () => void;
 }
 
-const Window: React.FC<WindowProps> = ({ id, title, children, isActive, onClose, onFocus }) => {
-  const [position, setPosition] = useState({ x: 100, y: 100 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const windowRef = useRef<HTMLDivElement>(null);
+const Window: React.FC<WindowProps> = ({ 
+  id, 
+  title, 
+  children, 
+  isActive, 
+  onClose, 
+  onFocus 
+}) => {
+  const [position, setPosition] = useState({ x: 50, y: 50 });
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [prevPosition, setPrevPosition] = useState({ x: 50, y: 50 });
+  const nodeRef = useRef<HTMLDivElement>(null);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!windowRef.current) return;
-    
-    onFocus();
-    setIsDragging(true);
-    
-    const rect = windowRef.current.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
+  // ランダムな初期位置を設定
+  useEffect(() => {
+    const randomX = Math.floor(Math.random() * 200);
+    const randomY = Math.floor(Math.random() * 100);
+    setPosition({ x: randomX, y: randomY });
+    setPrevPosition({ x: randomX, y: randomY });
+  }, []);
+
+  const handleDragStop = (e: any, data: { x: number; y: number }) => {
+    if (!isMaximized) {
+      setPosition({ x: data.x, y: data.y });
+      setPrevPosition({ x: data.x, y: data.y });
+    }
   };
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      
-      setPosition({
-        x: e.clientX - dragOffset.x,
-        y: e.clientY - dragOffset.y,
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+  const toggleMaximize = () => {
+    if (isMaximized) {
+      setIsMaximized(false);
+      setPosition(prevPosition);
+    } else {
+      setPrevPosition(position);
+      setIsMaximized(true);
     }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, dragOffset]);
+  };
 
   return (
-    <WindowContainer
-      ref={windowRef}
-      isActive={isActive}
-      position={position}
-      onClick={onFocus}
+    <Draggable
+      nodeRef={nodeRef as unknown as any}
+      handle=".window-title-bar"
+      position={isMaximized ? { x: 0, y: 0 } : position}
+      onStop={handleDragStop}
+      disabled={isMaximized}
     >
-      <WindowTitleBar isActive={isActive} onMouseDown={handleMouseDown}>
-        <Typography variant="subtitle2" noWrap sx={{ flexGrow: 1 }}>
-          {title}
-        </Typography>
-        <Box>
-          <IconButton size="small" color="inherit">
+      <WindowContainer
+        ref={nodeRef}
+        isActive={isActive}
+        isMaximized={isMaximized}
+        onClick={onFocus}
+      >
+        <WindowTitleBar className="window-title-bar" isActive={isActive}>
+          <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
+            {title}
+          </Typography>
+          <IconButton 
+            size="small" 
+            onClick={(e) => {
+              e.stopPropagation();
+              // 最小化機能は実装しない（オプション）
+            }}
+            sx={{ color: 'inherit' }}
+          >
             <MinimizeIcon fontSize="small" />
           </IconButton>
-          <IconButton size="small" color="inherit">
-            <CropSquareIcon fontSize="small" />
+          <IconButton 
+            size="small" 
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleMaximize();
+            }}
+            sx={{ color: 'inherit' }}
+          >
+            <OpenInFullIcon fontSize="small" />
           </IconButton>
-          <IconButton size="small" color="inherit" onClick={onClose}>
+          <IconButton 
+            size="small" 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            sx={{ color: 'inherit' }}
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
-        </Box>
-      </WindowTitleBar>
-      <Divider />
-      <WindowContent>{children}</WindowContent>
-    </WindowContainer>
+        </WindowTitleBar>
+        <WindowContent>
+          {children}
+        </WindowContent>
+      </WindowContainer>
+    </Draggable>
   );
 };
 

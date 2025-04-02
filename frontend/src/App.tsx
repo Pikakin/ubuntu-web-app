@@ -1,9 +1,10 @@
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Desktop from './components/Desktop';
 import Login from './components/Login';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './App.css';
 
 const theme = createTheme({
@@ -33,50 +34,36 @@ const theme = createTheme({
   },
 });
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+// 認証が必要なルートのラッパー
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   
-  // 初期化時に認証状態を確認
-  useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem('auth_token');
-      setIsAuthenticated(!!token);
-      setIsLoading(false);
-    };
-    
-    checkAuth();
-  }, []);
-
-  const handleLogin = (success: boolean) => {
-    setIsAuthenticated(success);
-  };
-
-  // ローディング中は何も表示しない
-  if (isLoading) {
-    return <div>Loading...</div>;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
   }
+  
+  return <>{children}</>;
+};
 
+function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={
-            isAuthenticated ? 
-              <Navigate to="/" /> : 
-              <Login onLogin={handleLogin} />
-          } />
-          <Route 
-            path="/*" 
-            element={
-              isAuthenticated ? 
-                <Desktop /> : 
-                <Navigate to="/login" />
-            } 
-          />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route 
+              path="/*" 
+              element={
+                <ProtectedRoute>
+                  <Desktop />
+                </ProtectedRoute>
+              } 
+            />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

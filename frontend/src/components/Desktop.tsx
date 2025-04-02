@@ -1,9 +1,12 @@
-import { AppBar, Box, IconButton, Paper, Toolbar, Typography } from '@mui/material';
+import { Box, Grid } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { fetchSystemInfo } from '../services/api';
+import Dashboard from './Dashboard';
 import DesktopIcon from './DesktopIcon';
 import FileExplorer from './FileExplorer';
+import ServiceMonitor from './ServiceMonitor';
 import StartMenu from './StartMenu';
 import Taskbar from './Taskbar';
 import Terminal from './Terminal';
@@ -40,6 +43,7 @@ const Desktop: React.FC = () => {
   const [openWindows, setOpenWindows] = useState<string[]>([]);
   const [activeWindow, setActiveWindow] = useState<string | null>(null);
   const [systemInfo, setSystemInfo] = useState<string>('');
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const getSystemInfo = async () => {
@@ -73,25 +77,21 @@ const Desktop: React.FC = () => {
       icon: 'info',
       component: (
         <Box p={2}>
-          <Typography variant="h6">System Information</Typography>
-          <Paper sx={{ p: 2, mt: 2, maxHeight: 400, overflow: 'auto' }}>
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{systemInfo}</pre>
-          </Paper>
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{systemInfo}</pre>
         </Box>
       ),
     },
     {
-      id: 'settings',
-      title: 'Settings',
+      id: 'dashboard',
+      title: 'Dashboard',
+      icon: 'dashboard',
+      component: <Dashboard />,
+    },
+    {
+      id: 'service-monitor',
+      title: 'Service Monitor',
       icon: 'settings',
-      component: (
-        <Box p={2}>
-          <Typography variant="h6">Settings</Typography>
-          <Typography paragraph sx={{ mt: 2 }}>
-            System settings will be implemented here.
-          </Typography>
-        </Box>
-      ),
+      component: <ServiceMonitor />,
     },
   ];
 
@@ -118,20 +118,24 @@ const Desktop: React.FC = () => {
     setActiveWindow(appId);
   };
 
+  const handleLogout = () => {
+    logout();
+  };
+
   return (
     <DesktopContainer>
       <DesktopArea>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 1 }}>
+        <Grid container spacing={2} style={{ marginTop: 10 }}>
           {apps.map((app) => (
-            <Box key={app.id}>
+            <Grid key={app.id}>
               <DesktopIcon
                 title={app.title}
                 icon={app.icon}
                 onClick={() => openApp(app.id)}
               />
-            </Box>
+            </Grid>
           ))}
-        </Box>
+        </Grid>
 
         {openWindows.map((appId) => {
           const app = apps.find(a => a.id === appId);
@@ -156,7 +160,9 @@ const Desktop: React.FC = () => {
         <StartMenu 
           apps={apps} 
           onAppClick={openApp} 
-          onClose={() => setStartMenuOpen(false)} 
+          onClose={() => setStartMenuOpen(false)}
+          onLogout={handleLogout}
+          username={user?.username || 'User'}
         />
       )}
 

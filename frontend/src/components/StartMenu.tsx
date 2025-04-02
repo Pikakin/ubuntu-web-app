@@ -1,4 +1,5 @@
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
 import InfoIcon from '@mui/icons-material/Info';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
@@ -9,6 +10,8 @@ import {
   Avatar, 
   Box, 
   Divider,
+  Grid, 
+  IconButton,
   InputAdornment,
   List, 
   ListItem, 
@@ -16,21 +19,21 @@ import {
   ListItemText,
   Paper, 
   TextField,
+  Tooltip,
   Typography 
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React from 'react';
+import React, { useState } from 'react';
 
 const StartMenuContainer = styled(Paper)(({ theme }) => ({
   position: 'absolute',
   bottom: 48, // タスクバーの高さ
-  left: '50%',
-  transform: 'translateX(-50%)',
+  left: 0,
   width: 600,
   maxHeight: 'calc(100vh - 100px)',
   backgroundColor: 'rgba(255, 255, 255, 0.9)',
   backdropFilter: 'blur(10px)',
-  borderRadius: 10,
+  borderRadius: '0 10px 0 0',
   boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
   overflow: 'hidden',
   display: 'flex',
@@ -47,12 +50,9 @@ const SearchBar = styled(TextField)(({ theme }) => ({
   },
 }));
 
-const AppGrid = styled(Box)(({ theme }) => ({
+const AppGrid = styled(Grid)(({ theme }) => ({
   padding: theme.spacing(2),
   overflowY: 'auto',
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
-  gap: theme.spacing(2),
 }));
 
 const AppItem = styled(Paper)(({ theme }) => ({
@@ -87,6 +87,8 @@ interface StartMenuProps {
   apps: App[];
   onAppClick: (appId: string) => void;
   onClose: () => void;
+  onLogout: () => void;
+  username: string;
 }
 
 const getIconComponent = (iconName: string) => {
@@ -99,18 +101,33 @@ const getIconComponent = (iconName: string) => {
       return <InfoIcon fontSize="large" />;
     case 'terminal':
       return <TerminalIcon fontSize="large" />;
+    case 'dashboard':
+      return <DashboardIcon fontSize="large" />;
     default:
       return <FolderIcon fontSize="large" />;
   }
 };
 
-const StartMenu: React.FC<StartMenuProps> = ({ apps, onAppClick, onClose }) => {
+const StartMenu: React.FC<StartMenuProps> = ({ apps, onAppClick, onClose, onLogout, username }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const filteredApps = apps.filter(app => 
+    app.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleAppClick = (appId: string) => {
+    onAppClick(appId);
+    onClose();
+  };
+
   return (
     <StartMenuContainer>
       <SearchBar
         fullWidth
         placeholder="Type here to search"
         variant="outlined"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
@@ -120,14 +137,22 @@ const StartMenu: React.FC<StartMenuProps> = ({ apps, onAppClick, onClose }) => {
         }}
       />
       
-      <AppGrid>
-        {apps.map((app) => (
-          <AppItem key={app.id} onClick={() => onAppClick(app.id)}>
-            {getIconComponent(app.icon)}
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              {app.title}
-            </Typography>
-          </AppItem>
+      <AppGrid container spacing={2}>
+        {filteredApps.map((app) => (
+          <Grid 
+            component="div" 
+            key={app.id}
+            sx={{ 
+              width: { xs: '25%' }  // xs={3} の代わりに幅を25%に設定
+            }}
+          >
+            <AppItem onClick={() => handleAppClick(app.id)}>
+              {getIconComponent(app.icon)}
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {app.title}
+              </Typography>
+            </AppItem>
+          </Grid>
         ))}
       </AppGrid>
       
@@ -136,12 +161,16 @@ const StartMenu: React.FC<StartMenuProps> = ({ apps, onAppClick, onClose }) => {
           <AccountCircleIcon />
         </Avatar>
         <Box sx={{ flexGrow: 1 }}>
-          <Typography variant="subtitle1">User</Typography>
+          <Typography variant="subtitle1">{username}</Typography>
           <Typography variant="body2" color="textSecondary">
-            user@ubuntu
+            {username}@ubuntu
           </Typography>
         </Box>
-        <PowerSettingsNewIcon color="action" />
+        <Tooltip title="Logout">
+          <IconButton color="primary" onClick={onLogout}>
+            <PowerSettingsNewIcon />
+          </IconButton>
+        </Tooltip>
       </UserSection>
     </StartMenuContainer>
   );
