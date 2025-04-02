@@ -29,7 +29,7 @@ Ubuntu Web OSは、ウェブブラウザからUbuntuサーバーを操作でき�
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/yourusername/ubuntu-web-os.git
+git clone https://github.com/Pikakin/ubuntu-web-os.git
 cd ubuntu-web-os
 
 # 依存関係をインストール
