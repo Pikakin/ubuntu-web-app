@@ -1,7 +1,12 @@
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { Box, Card, CardContent, LinearProgress, Paper, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
 import Grid from '@mui/material/Grid';
 import IconButton from '@mui/material/IconButton';
+import LinearProgress from '@mui/material/LinearProgress';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';
 import React, { useState, useEffect } from 'react';
 import { executeCommand } from '../services/api';
@@ -15,6 +20,22 @@ const DashboardContainer = styled(Box)(({ theme }) => ({
 const MetricCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
   height: '100%',
+}));
+
+// 代替のグリッドレイアウト
+const GridContainer = styled(Box)(({ theme }) => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(12, 1fr)',
+  gap: theme.spacing(3),
+}));
+
+const GridItem = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'colSpan'
+})<{ colSpan?: { xs: number; md?: number } }>(({ theme, colSpan }) => ({
+  gridColumn: colSpan?.xs ? `span ${colSpan.xs}` : 'span 12',
+  [theme.breakpoints.up('md')]: {
+    gridColumn: colSpan?.md ? `span ${colSpan.md}` : undefined,
+  },
 }));
 
 const Dashboard: React.FC = () => {
@@ -59,7 +80,11 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 30000); // 30秒ごとに更新
+    
+    // 1秒ごとに更新するインターバルを設定
+    const interval = setInterval(fetchMetrics, 1000);
+    
+    // クリーンアップ関数
     return () => clearInterval(interval);
   }, []);
 
@@ -85,8 +110,8 @@ const Dashboard: React.FC = () => {
         </Box>
       </Box>
       
-      <Grid container spacing={3}>
-        <Grid component="div" sx={{ gridColumn: { xs: 'span 12', md: 'span 6' } }}>
+      <GridContainer>
+        <GridItem colSpan={{ xs: 12, md: 6 }}>
           <MetricCard>
             <Typography variant="h6">CPU Usage</Typography>
             <LinearProgress 
@@ -97,9 +122,9 @@ const Dashboard: React.FC = () => {
             />
             <Typography variant="body2">{cpuUsage.toFixed(1)}%</Typography>
           </MetricCard>
-        </Grid>
+        </GridItem>
         
-        <Grid component="div" sx={{ gridColumn: { xs: 'span 12', md: 'span 6' } }}>
+        <GridItem colSpan={{ xs: 12, md: 6 }}>
           <MetricCard>
             <Typography variant="h6">Memory Usage</Typography>
             <LinearProgress 
@@ -110,9 +135,9 @@ const Dashboard: React.FC = () => {
             />
             <Typography variant="body2">{memoryUsage.toFixed(1)}%</Typography>
           </MetricCard>
-        </Grid>
+        </GridItem>
         
-        <Grid component="div" sx={{ gridColumn: { xs: 'span 12', md: 'span 6' } }}>
+        <GridItem colSpan={{ xs: 12, md: 6 }}>
           <MetricCard>
             <Typography variant="h6">Disk Usage</Typography>
             <LinearProgress 
@@ -123,18 +148,18 @@ const Dashboard: React.FC = () => {
             />
             <Typography variant="body2">{diskUsage.toFixed(1)}%</Typography>
           </MetricCard>
-        </Grid>
+        </GridItem>
         
-        <Grid component="div" sx={{ gridColumn: { xs: 'span 12', md: 'span 6' } }}>
+        <GridItem colSpan={{ xs: 12, md: 6 }}>
           <MetricCard>
             <Typography variant="h6">System Uptime</Typography>
             <Typography variant="body1" sx={{ mt: 2 }}>
               {uptime}
             </Typography>
           </MetricCard>
-        </Grid>
+        </GridItem>
 
-        <Grid component="div" sx={{ gridColumn: 'span 12' }}>
+        <GridItem colSpan={{ xs: 12 }}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
@@ -147,8 +172,8 @@ const Dashboard: React.FC = () => {
               </Paper>
             </CardContent>
           </Card>
-        </Grid>
-      </Grid>
+        </GridItem>
+      </GridContainer>
     </DashboardContainer>
   );
 };

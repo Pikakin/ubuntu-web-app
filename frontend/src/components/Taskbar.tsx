@@ -1,12 +1,19 @@
 import AppsIcon from '@mui/icons-material/Apps';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
 import InfoIcon from '@mui/icons-material/Info';
 import SettingsIcon from '@mui/icons-material/Settings';
+import SignalWifi4BarIcon from '@mui/icons-material/SignalWifi4Bar';
 import TerminalIcon from '@mui/icons-material/Terminal';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import { AppBar, Box, IconButton, Toolbar, Tooltip, Typography } from '@mui/material';
+import AppBar from '@mui/material/AppBar';
+import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
+import Toolbar from '@mui/material/Toolbar';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { executeCommand } from '../services/api';
 
 const TaskbarContainer = styled(AppBar)(({ theme }) => ({
   top: 'auto',
@@ -40,6 +47,21 @@ const TaskbarItem = styled(Box, {
   '&:hover': {
     backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
   },
+}));
+
+const StatusArea = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  marginLeft: 'auto',
+  color: theme.palette.common.white,
+}));
+
+const StatusItem = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  padding: theme.spacing(0, 1),
+  borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+  height: '100%',
 }));
 
 interface App {
@@ -78,26 +100,93 @@ const Taskbar: React.FC<TaskbarProps> = ({
   activeApp, 
   onAppClick 
 }) => {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [serverStatus, setServerStatus] = useState<'online' | 'offline'>('online');
+  
+  // 現在時刻を更新
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, []);
+  
+  // サーバー状態を確認
+  useEffect(() => {
+    const checkServerStatus = async () => {
+      try {
+        await executeCommand('echo "Server check"');
+        setServerStatus('online');
+      } catch (error) {
+        setServerStatus('offline');
+      }
+    };
+    
+    checkServerStatus();
+    const interval = setInterval(checkServerStatus, 30000); // 30秒ごとに確認
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  // 時刻のフォーマット
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+  
+  // 日付のフォーマット
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
   return (
     <TaskbarContainer position="fixed">
-      <Toolbar variant="dense">
-        <StartButton onClick={onStartClick}>
-          <AppsIcon />
-        </StartButton>
-        
-        {openApps.map((app) => (
-          <Tooltip key={app.id} title={app.title}>
-            <TaskbarItem 
-              isActive={activeApp === app.id}
-              onClick={() => onAppClick(app.id)}
-            >
-              {getIconComponent(app.icon)}
-              <Typography variant="body2" sx={{ ml: 1 }}>
-                {app.title}
+      <Toolbar variant="dense" sx={{ justifyContent: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', maxWidth: 1200 }}>
+          <StartButton onClick={onStartClick}>
+            <AppsIcon />
+          </StartButton>
+          
+          <Box sx={{ display: 'flex', overflowX: 'auto', flexGrow: 1 }}>
+            {openApps.map((app) => (
+              <Tooltip key={app.id} title={app.title}>
+                <TaskbarItem 
+                  isActive={activeApp === app.id}
+                  onClick={() => onAppClick(app.id)}
+                >
+                  {getIconComponent(app.icon)}
+                </TaskbarItem>
+              </Tooltip>
+            ))}
+          </Box>
+          
+          <StatusArea>
+            <StatusItem>
+              <SignalWifi4BarIcon 
+                fontSize="small" 
+                sx={{ 
+                  mr: 0.5, 
+                  color: serverStatus === 'online' ? 'success.main' : 'error.main' 
+                }} 
+              />
+              <Typography variant="caption">
+                {serverStatus === 'online' ? 'Connected' : 'Disconnected'}
               </Typography>
-            </TaskbarItem>
-          </Tooltip>
-        ))}
+            </StatusItem>
+            
+            <StatusItem>
+              <Typography variant="caption" sx={{ fontWeight: 'medium' }}>
+                {formatTime(currentTime)}
+              </Typography>
+            </StatusItem>
+            
+            <StatusItem>
+              <Typography variant="caption">
+                {formatDate(currentTime)}
+              </Typography>
+            </StatusItem>
+          </StatusArea>
+        </Box>
       </Toolbar>
     </TaskbarContainer>
   );
