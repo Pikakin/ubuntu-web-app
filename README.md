@@ -20,8 +20,8 @@ Ubuntu Web OSは、ウェブブラウザからUbuntuサーバーを操作でき�
 
 #### 前提条件
 
-*   Go 1.16以上
-*   Node.js 14以上
+*   Go 1.22以上
+*   Node.js 23以上
 *   npm または yarn
 *   Ubuntuサーバー（推奨: Ubuntu 20.04 LTS以上）
 
