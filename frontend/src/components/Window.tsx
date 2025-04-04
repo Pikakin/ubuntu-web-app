@@ -3,14 +3,13 @@ import MinimizeIcon from '@mui/icons-material/Minimize';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import { Box, IconButton, Paper, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React, { useState, useRef, useEffect } from 'react';
-import Draggable, { DraggableProps } from 'react-draggable';
-import { Resizable } from 'react-resizable';
-import 'react-resizable/css/styles.css';
+import React, { useState, useRef, useEffect, useContext } from 'react';
+import Draggable from 'react-draggable';
+import { SettingsContext } from '../contexts/SettingsContext';
 
 const WindowContainer = styled(Paper, {
-  shouldForwardProp: (prop) => prop !== 'isActive' && prop !== 'isMaximized'
-})<{ isActive: boolean; isMaximized: boolean }>(({ theme, isActive, isMaximized }) => ({
+  shouldForwardProp: (prop) => prop !== 'isActive' && prop !== 'isMaximized' && prop !== 'useTransparency'
+})<{ isActive: boolean; isMaximized: boolean; useTransparency?: boolean }>(({ theme, isActive, isMaximized, useTransparency }) => ({
   position: 'absolute',
   display: 'flex',
   flexDirection: 'column',
@@ -23,6 +22,10 @@ const WindowContainer = styled(Paper, {
   borderRadius: 4,
   overflow: 'hidden',
   zIndex: isActive ? 100 : 10,
+  backgroundColor: useTransparency 
+    ? (theme.palette.mode === 'dark' ? 'rgba(48, 48, 48, 0.9)' : 'rgba(255, 255, 255, 0.9)')
+    : theme.palette.background.paper,
+  backdropFilter: useTransparency ? 'blur(10px)' : 'none',
   ...(isMaximized && {
     top: 0,
     left: 0,
@@ -55,7 +58,7 @@ const WindowTitleBar = styled(Box, {
 const WindowContent = styled(Box)(({ theme }) => ({
   flexGrow: 1,
   overflow: 'auto',
-  backgroundColor: theme.palette.background.paper,
+  backgroundColor: 'transparent',
 }));
 
 interface WindowProps {
@@ -75,10 +78,11 @@ const Window: React.FC<WindowProps> = ({
   onClose, 
   onFocus 
 }) => {
+  const { settings } = useContext(SettingsContext);
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [isMaximized, setIsMaximized] = useState(false);
   const [prevPosition, setPrevPosition] = useState({ x: 50, y: 50 });
-  const nodeRef = useRef<HTMLDivElement>(null);
+  const nodeRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
 
   // ランダムな初期位置を設定
   useEffect(() => {
@@ -107,7 +111,7 @@ const Window: React.FC<WindowProps> = ({
 
   return (
     <Draggable
-      nodeRef={nodeRef as unknown as any}
+      nodeRef={nodeRef}
       handle=".window-title-bar"
       position={isMaximized ? { x: 0, y: 0 } : position}
       onStop={handleDragStop}
@@ -117,6 +121,7 @@ const Window: React.FC<WindowProps> = ({
         ref={nodeRef}
         isActive={isActive}
         isMaximized={isMaximized}
+        useTransparency={settings?.useTransparency !== false}
         onClick={onFocus}
       >
         <WindowTitleBar className="window-title-bar" isActive={isActive}>

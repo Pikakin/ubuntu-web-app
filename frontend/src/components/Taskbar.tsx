@@ -12,16 +12,20 @@ import Toolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { styled } from '@mui/material/styles';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { SettingsContext } from '../contexts/SettingsContext';
 import { executeCommand } from '../services/api';
 
-const TaskbarContainer = styled(AppBar)(({ theme }) => ({
-  top: 'auto',
-  bottom: 0,
-  backgroundColor: 'rgba(25, 25, 25, 0.9)',
-  backdropFilter: 'blur(10px)',
-  boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.1)',
-  height: 48,
+const TaskbarContainer = styled(AppBar, {
+  shouldForwardProp: (prop) => prop !== 'taskbarPosition' && prop !== 'size' && prop !== 'useTransparency'
+})<{ taskbarPosition?: string; size?: number; useTransparency?: boolean }>(({ theme, taskbarPosition, size, useTransparency }) => ({
+  position: 'fixed',
+  top: taskbarPosition === 'top' ? 0 : 'auto',
+  bottom: taskbarPosition === 'bottom' ? 0 : 'auto',
+  backgroundColor: useTransparency ? 'rgba(25, 25, 25, 0.9)' : 'rgb(25, 25, 25)',
+  backdropFilter: useTransparency ? 'blur(10px)' : 'none',
+  boxShadow: taskbarPosition === 'top' ? '0 2px 10px rgba(0, 0, 0, 0.1)' : '0 -2px 10px rgba(0, 0, 0, 0.1)',
+  height: size || 48,
 }));
 
 const StartButton = styled(IconButton)(({ theme }) => ({
@@ -35,11 +39,11 @@ const StartButton = styled(IconButton)(({ theme }) => ({
 }));
 
 const TaskbarItem = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'isActive'
-})<{ isActive: boolean }>(({ theme, isActive }) => ({
+  shouldForwardProp: (prop) => prop !== 'isActive' && prop !== 'showName'
+})<{ isActive: boolean; showName?: boolean }>(({ theme, isActive, showName }) => ({
   display: 'flex',
   alignItems: 'center',
-  padding: theme.spacing(0.5, 1),
+  padding: theme.spacing(0.5, showName ? 1 : 0.5),
   marginRight: theme.spacing(1),
   borderRadius: 4,
   cursor: 'pointer',
@@ -100,6 +104,7 @@ const Taskbar: React.FC<TaskbarProps> = ({
   activeApp, 
   onAppClick 
 }) => {
+  const { settings } = useContext(SettingsContext);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [serverStatus, setServerStatus] = useState<'online' | 'offline'>('online');
   
@@ -140,21 +145,46 @@ const Taskbar: React.FC<TaskbarProps> = ({
   };
 
   return (
-    <TaskbarContainer position="fixed">
-      <Toolbar variant="dense" sx={{ justifyContent: 'center' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', maxWidth: 1200 }}>
+    <TaskbarContainer 
+      taskbarPosition={settings?.taskbarPosition || 'bottom'} 
+      size={settings?.taskbarSize || 48} 
+      useTransparency={settings?.useTransparency !== false}
+    >
+      <Toolbar variant="dense" sx={{ 
+        justifyContent: settings?.taskbarStyle === 'centered' ? 'center' : 'flex-start',
+        minHeight: settings?.taskbarSize || 48,
+        padding: 0
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          width: '100%', 
+          maxWidth: 1200,
+          px: 1
+        }}>
           <StartButton onClick={onStartClick}>
             <AppsIcon />
           </StartButton>
           
-          <Box sx={{ display: 'flex', overflowX: 'auto', flexGrow: 1 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            overflowX: 'auto', 
+            flexGrow: 1,
+            justifyContent: settings?.taskbarStyle === 'centered' ? 'center' : 'flex-start'
+          }}>
             {openApps.map((app) => (
-              <Tooltip key={app.id} title={app.title}>
+              <Tooltip key={app.id} title={settings?.showAppNames ? '' : app.title}>
                 <TaskbarItem 
                   isActive={activeApp === app.id}
+                  showName={settings?.showAppNames !== false}
                   onClick={() => onAppClick(app.id)}
                 >
                   {getIconComponent(app.icon)}
+                  {settings?.showAppNames !== false && (
+                    <Typography variant="body2" sx={{ ml: 1 }}>
+                      {app.title}
+                    </Typography>
+                  )}
                 </TaskbarItem>
               </Tooltip>
             ))}

@@ -1,22 +1,26 @@
 import { Box, Grid } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { SettingsContext } from '../contexts/SettingsContext';
 import { fetchSystemInfo } from '../services/api';
 import Dashboard from './Dashboard';
 import DesktopIcon from './DesktopIcon';
 import FileExplorer from './FileExplorer';
 import ServiceMonitor from './ServiceMonitor';
+import Settings from './Settings';
 import StartMenu from './StartMenu';
 import Taskbar from './Taskbar';
 import Terminal from './Terminal';
 import Window from './Window';
 
-const DesktopContainer = styled(Box)(({ theme }) => ({
+const DesktopContainer = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'wallpaper'
+})<{ wallpaper: string }>(({ theme, wallpaper }) => ({
   height: '100vh',
   width: '100vw',
   overflow: 'hidden',
-  backgroundImage: 'url(/wallpapers/default.jpg)',
+  backgroundImage: `url(/wallpapers/${wallpaper}.jpg)`,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   position: 'relative',
@@ -24,11 +28,19 @@ const DesktopContainer = styled(Box)(({ theme }) => ({
   flexDirection: 'column',
 }));
 
-const DesktopArea = styled(Box)(({ theme }) => ({
+const DesktopArea = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'taskbarPosition' && prop !== 'taskbarSize'
+})<{ taskbarPosition: string; taskbarSize: number }>(({ theme, taskbarPosition, taskbarSize }) => ({
   flexGrow: 1,
   padding: theme.spacing(2),
   position: 'relative',
   overflowY: 'auto',
+  ...(taskbarPosition === 'bottom' && {
+    paddingBottom: taskbarSize + theme.spacing(2),
+  }),
+  ...(taskbarPosition === 'top' && {
+    paddingTop: taskbarSize + theme.spacing(2),
+  }),
 }));
 
 interface App {
@@ -39,6 +51,7 @@ interface App {
 }
 
 const Desktop: React.FC = () => {
+  const { settings } = useContext(SettingsContext);
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const [openWindows, setOpenWindows] = useState<string[]>([]);
   const [activeWindow, setActiveWindow] = useState<string | null>(null);
@@ -93,6 +106,12 @@ const Desktop: React.FC = () => {
       icon: 'settings',
       component: <ServiceMonitor />,
     },
+    {
+      id: 'settings',
+      title: 'Settings',
+      icon: 'settings',
+      component: <Settings />,
+    },
   ];
 
   const toggleStartMenu = () => {
@@ -123,8 +142,11 @@ const Desktop: React.FC = () => {
   };
 
   return (
-    <DesktopContainer>
-      <DesktopArea>
+    <DesktopContainer wallpaper={settings.wallpaper || 'default'}>
+      <DesktopArea 
+        taskbarPosition={settings.taskbarPosition || 'bottom'}
+        taskbarSize={settings.taskbarSize || 48}
+      >
         <Grid container spacing={2} style={{ marginTop: 10 }}>
           {apps.map((app) => (
             <Grid key={app.id}>
