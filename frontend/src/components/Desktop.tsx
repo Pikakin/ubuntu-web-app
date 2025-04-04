@@ -20,7 +20,7 @@ const DesktopContainer = styled(Box, {
   height: '100vh',
   width: '100vw',
   overflow: 'hidden',
-  backgroundImage: `url(/wallpapers/${wallpaper}.jpg)`,
+  backgroundImage: `url(/wallpapers/${wallpaper || 'default'}.jpg)`,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   position: 'relative',
@@ -54,6 +54,7 @@ const Desktop: React.FC = () => {
   const { settings } = useContext(SettingsContext);
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const [openWindows, setOpenWindows] = useState<string[]>([]);
+  const [minimizedWindows, setMinimizedWindows] = useState<string[]>([]);
   const [activeWindow, setActiveWindow] = useState<string | null>(null);
   const [systemInfo, setSystemInfo] = useState<string>('');
   const { user, logout } = useAuth();
@@ -122,34 +123,63 @@ const Desktop: React.FC = () => {
     if (!openWindows.includes(appId)) {
       setOpenWindows([...openWindows, appId]);
     }
+    
+    // アプリが最小化されていた場合、最小化リストから削除
+    if (minimizedWindows.includes(appId)) {
+      setMinimizedWindows(minimizedWindows.filter(id => id !== appId));
+    }
+    
     setActiveWindow(appId);
     setStartMenuOpen(false);
   };
 
   const closeApp = (appId: string) => {
     setOpenWindows(openWindows.filter(id => id !== appId));
+    setMinimizedWindows(minimizedWindows.filter(id => id !== appId));
+    
     if (activeWindow === appId) {
-      setActiveWindow(openWindows.length > 1 ? openWindows.filter(id => id !== appId)[0] : null);
+      // 閉じたウィンドウがアクティブだった場合、次のウィンドウをアクティブにする
+      const remainingWindows = openWindows.filter(id => id !== appId && !minimizedWindows.includes(id));
+      setActiveWindow(remainingWindows.length > 0 ? remainingWindows[0] : null);
     }
   };
 
   const activateWindow = (appId: string) => {
+    // 最小化されていたウィンドウを復元
+    if (minimizedWindows.includes(appId)) {
+      setMinimizedWindows(minimizedWindows.filter(id => id !== appId));
+    }
+    
     setActiveWindow(appId);
+  };
+
+  const minimizeWindow = (appId: string) => {
+    if (!minimizedWindows.includes(appId)) {
+      setMinimizedWindows([...minimizedWindows, appId]);
+    }
+    
+    // 最小化したウィンドウがアクティブだった場合、次のウィンドウをアクティブにする
+    if (activeWindow === appId) {
+      const visibleWindows = openWindows.filter(id => !minimizedWindows.includes(id) && id !== appId);
+      setActiveWindow(visibleWindows.length > 0 ? visibleWindows[0] : null);
+    }
   };
 
   const handleLogout = () => {
     logout();
   };
 
+  // 設定からウォールペーパーとタスクバーの位置を取得
+  const wallpaper = settings?.wallpaper || 'default';
+  const taskbarPosition = settings?.taskbarPosition || 'bottom';
+  const taskbarSize = settings?.taskbarSize || 48;
+
   return (
-    <DesktopContainer wallpaper={settings.wallpaper || 'default'}>
-      <DesktopArea 
-        taskbarPosition={settings.taskbarPosition || 'bottom'}
-        taskbarSize={settings.taskbarSize || 48}
-      >
+    <DesktopContainer wallpaper={wallpaper}>
+      <DesktopArea taskbarPosition={taskbarPosition} taskbarSize={taskbarSize}>
         <Grid container spacing={2} style={{ marginTop: 10 }}>
           {apps.map((app) => (
-            <Grid key={app.id}>
+            <Grid component="div" key={app.id}>
               <DesktopIcon
                 title={app.title}
                 icon={app.icon}
@@ -171,6 +201,7 @@ const Desktop: React.FC = () => {
               isActive={activeWindow === app.id}
               onClose={() => closeApp(app.id)}
               onFocus={() => activateWindow(app.id)}
+              onMinimize={minimizeWindow}
             >
               {app.component}
             </Window>
@@ -192,7 +223,10 @@ const Desktop: React.FC = () => {
         onStartClick={toggleStartMenu} 
         openApps={openWindows.map(id => apps.find(app => app.id === id)!)}
         activeApp={activeWindow}
+        minimizedApps={minimizedWindows}
         onAppClick={activateWindow}
+        position={taskbarPosition}
+        size={taskbarSize}
       />
     </DesktopContainer>
   );

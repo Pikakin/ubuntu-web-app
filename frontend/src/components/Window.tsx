@@ -1,15 +1,41 @@
 import CloseIcon from '@mui/icons-material/Close';
+import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
 import MinimizeIcon from '@mui/icons-material/Minimize';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import { Box, IconButton, Paper, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import Draggable from 'react-draggable';
+import { Resizable } from 'react-resizable';
+import 'react-resizable/css/styles.css';
 import { SettingsContext } from '../contexts/SettingsContext';
 
+// リサイズハンドルのスタイル
+const ResizeHandle = styled(Box)(({ theme }) => ({
+  position: 'absolute',
+  width: 10,
+  height: 10,
+  background: 'transparent',
+  border: 'none',
+  '&.bottom-right': {
+    bottom: 0,
+    right: 0,
+    cursor: 'nwse-resize',
+  },
+}));
+
 const WindowContainer = styled(Paper, {
-  shouldForwardProp: (prop) => prop !== 'isActive' && prop !== 'isMaximized' && prop !== 'useTransparency'
-})<{ isActive: boolean; isMaximized: boolean; useTransparency?: boolean }>(({ theme, isActive, isMaximized, useTransparency }) => ({
+  shouldForwardProp: (prop) => 
+    prop !== 'isActive' && 
+    prop !== 'isMaximized' && 
+    prop !== 'useTransparency' && 
+    prop !== 'isMinimized'
+})<{ 
+  isActive: boolean; 
+  isMaximized: boolean; 
+  useTransparency?: boolean;
+  isMinimized: boolean;
+}>(({ theme, isActive, isMaximized, useTransparency, isMinimized }) => ({
   position: 'absolute',
   display: 'flex',
   flexDirection: 'column',
@@ -35,9 +61,12 @@ const WindowContainer = styled(Paper, {
     height: 'calc(100vh - 48px)',
     transform: 'none !important',
   }),
-  ...(isMaximized === false && {
+  ...(isMaximized === false && isMinimized === false && {
     width: 800,
     height: 600,
+  }),
+  ...(isMinimized && {
+    display: 'none',
   }),
 }));
 
@@ -59,6 +88,8 @@ const WindowContent = styled(Box)(({ theme }) => ({
   flexGrow: 1,
   overflow: 'auto',
   backgroundColor: 'transparent',
+  height: '100%',
+  width: '100%',
 }));
 
 interface WindowProps {
@@ -68,6 +99,7 @@ interface WindowProps {
   isActive: boolean;
   onClose: () => void;
   onFocus: () => void;
+  onMinimize?: (id: string) => void;
 }
 
 const Window: React.FC<WindowProps> = ({ 
@@ -76,12 +108,16 @@ const Window: React.FC<WindowProps> = ({
   children, 
   isActive, 
   onClose, 
-  onFocus 
+  onFocus,
+  onMinimize
 }) => {
   const { settings } = useContext(SettingsContext);
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [prevPosition, setPrevPosition] = useState({ x: 50, y: 50 });
+  const [size, setSize] = useState({ width: 800, height: 600 });
+  const [prevSize, setPrevSize] = useState({ width: 800, height: 600 });
   const nodeRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
 
   // ランダムな初期位置を設定
@@ -103,10 +139,109 @@ const Window: React.FC<WindowProps> = ({
     if (isMaximized) {
       setIsMaximized(false);
       setPosition(prevPosition);
+      setSize(prevSize);
     } else {
       setPrevPosition(position);
+      setPrevSize(size);
       setIsMaximized(true);
     }
+    
+    // リサイズイベントを発火して子コンポーネントに通知
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
+  };
+
+  const handleMinimize = () => {
+    setIsMinimized(true);
+    if (onMinimize) {
+      onMinimize(id);
+    }
+  };
+
+  // タスクバーからの復元
+  useEffect(() => {
+    if (isActive && isMinimized) {
+      setIsMinimized(false);
+    }
+  }, [isActive, isMinimized]);
+
+  // リサイズハンドラ
+  const onResize = (event: React.SyntheticEvent, { size }: { size: { width: number; height: number } }) => {
+    if (!isMaximized) {
+      setSize({ width: size.width, height: size.height });
+      
+      // リサイズイベントを発火して子コンポーネントに通知
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 100);
+    }
+  };
+
+  // リサイズ可能なウィンドウをレンダリング
+  const renderResizableWindow = () => {
+    return (
+      <Resizable
+        width={size.width}
+        height={size.height}
+        onResize={onResize}
+        handle={
+          <ResizeHandle className="bottom-right" />
+        }
+        resizeHandles={['se']}
+        minConstraints={[300, 200]}
+        maxConstraints={[window.innerWidth - 50, window.innerHeight - 100]}
+      >
+        <WindowContainer
+          ref={nodeRef}
+          isActive={isActive}
+          isMaximized={isMaximized}
+          isMinimized={isMinimized}
+          useTransparency={settings?.useTransparency !== false}
+          onClick={onFocus}
+          style={{ width: size.width, height: size.height }}
+        >
+          <WindowTitleBar className="window-title-bar" isActive={isActive}>
+            <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
+              {title}
+            </Typography>
+            <IconButton 
+              size="small" 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleMinimize();
+              }}
+              sx={{ color: 'inherit' }}
+            >
+              <MinimizeIcon fontSize="small" />
+            </IconButton>
+            <IconButton 
+              size="small" 
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleMaximize();
+              }}
+              sx={{ color: 'inherit' }}
+            >
+              {isMaximized ? <CloseFullscreenIcon fontSize="small" /> : <OpenInFullIcon fontSize="small" />}
+            </IconButton>
+            <IconButton 
+              size="small" 
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              sx={{ color: 'inherit' }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </WindowTitleBar>
+          <WindowContent>
+            {children}
+          </WindowContent>
+        </WindowContainer>
+      </Resizable>
+    );
   };
 
   return (
@@ -117,52 +252,55 @@ const Window: React.FC<WindowProps> = ({
       onStop={handleDragStop}
       disabled={isMaximized}
     >
-      <WindowContainer
-        ref={nodeRef}
-        isActive={isActive}
-        isMaximized={isMaximized}
-        useTransparency={settings?.useTransparency !== false}
-        onClick={onFocus}
-      >
-        <WindowTitleBar className="window-title-bar" isActive={isActive}>
-          <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
-            {title}
-          </Typography>
-          <IconButton 
-            size="small" 
-            onClick={(e) => {
-              e.stopPropagation();
-              // 最小化機能は実装しない（オプション）
-            }}
-            sx={{ color: 'inherit' }}
-          >
-            <MinimizeIcon fontSize="small" />
-          </IconButton>
-          <IconButton 
-            size="small" 
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleMaximize();
-            }}
-            sx={{ color: 'inherit' }}
-          >
-            <OpenInFullIcon fontSize="small" />
-          </IconButton>
-          <IconButton 
-            size="small" 
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            sx={{ color: 'inherit' }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </WindowTitleBar>
-        <WindowContent>
-          {children}
-        </WindowContent>
-      </WindowContainer>
+      {isMaximized ? (
+        <WindowContainer
+          ref={nodeRef}
+          isActive={isActive}
+          isMaximized={isMaximized}
+          isMinimized={isMinimized}
+          useTransparency={settings?.useTransparency !== false}
+          onClick={onFocus}
+        >
+          <WindowTitleBar className="window-title-bar" isActive={isActive}>
+            <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
+              {title}
+            </Typography>
+            <IconButton 
+              size="small" 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleMinimize();
+              }}
+              sx={{ color: 'inherit' }}
+            >
+              <MinimizeIcon fontSize="small" />
+            </IconButton>
+            <IconButton 
+              size="small" 
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleMaximize();
+              }}
+              sx={{ color: 'inherit' }}
+            >
+              <CloseFullscreenIcon fontSize="small" />
+            </IconButton>
+            <IconButton 
+              size="small" 
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              sx={{ color: 'inherit' }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </WindowTitleBar>
+          <WindowContent>
+            {children}
+          </WindowContent>
+        </WindowContainer>
+      ) : renderResizableWindow()}
     </Draggable>
   );
 };

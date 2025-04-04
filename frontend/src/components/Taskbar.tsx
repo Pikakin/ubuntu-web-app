@@ -17,15 +17,21 @@ import { SettingsContext } from '../contexts/SettingsContext';
 import { executeCommand } from '../services/api';
 
 const TaskbarContainer = styled(AppBar, {
-  shouldForwardProp: (prop) => prop !== 'taskbarPosition' && prop !== 'size' && prop !== 'useTransparency'
-})<{ taskbarPosition?: string; size?: number; useTransparency?: boolean }>(({ theme, taskbarPosition, size, useTransparency }) => ({
-  position: 'fixed',
+  shouldForwardProp: (prop) => prop !== 'taskbarPosition' && prop !== 'taskbarSize' && prop !== 'useTransparency'
+})<{ taskbarPosition: string; taskbarSize: number; useTransparency?: boolean }>(({ theme, taskbarPosition, taskbarSize, useTransparency }) => ({
+  position: 'fixed', // AppBar の position プロパティに有効な値を設定
   top: taskbarPosition === 'top' ? 0 : 'auto',
   bottom: taskbarPosition === 'bottom' ? 0 : 'auto',
-  backgroundColor: useTransparency ? 'rgba(25, 25, 25, 0.9)' : 'rgb(25, 25, 25)',
+  backgroundColor: useTransparency 
+    ? 'rgba(25, 25, 25, 0.9)' 
+    : theme.palette.mode === 'dark' 
+      ? theme.palette.background.paper 
+      : 'rgba(25, 25, 25, 0.95)',
   backdropFilter: useTransparency ? 'blur(10px)' : 'none',
-  boxShadow: taskbarPosition === 'top' ? '0 2px 10px rgba(0, 0, 0, 0.1)' : '0 -2px 10px rgba(0, 0, 0, 0.1)',
-  height: size || 48,
+  boxShadow: taskbarPosition === 'top' 
+    ? '0 2px 10px rgba(0, 0, 0, 0.1)' 
+    : '0 -2px 10px rgba(0, 0, 0, 0.1)',
+  height: taskbarSize,
 }));
 
 const StartButton = styled(IconButton)(({ theme }) => ({
@@ -39,17 +45,25 @@ const StartButton = styled(IconButton)(({ theme }) => ({
 }));
 
 const TaskbarItem = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'isActive' && prop !== 'showName'
-})<{ isActive: boolean; showName?: boolean }>(({ theme, isActive, showName }) => ({
+  shouldForwardProp: (prop) => prop !== 'isActive' && prop !== 'isMinimized'
+})<{ isActive: boolean; isMinimized: boolean }>(({ theme, isActive, isMinimized }) => ({
   display: 'flex',
   alignItems: 'center',
-  padding: theme.spacing(0.5, showName ? 1 : 0.5),
+  padding: theme.spacing(0.5, 1),
   marginRight: theme.spacing(1),
   borderRadius: 4,
   cursor: 'pointer',
-  backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+  backgroundColor: isActive 
+    ? 'rgba(255, 255, 255, 0.2)' 
+    : isMinimized 
+      ? 'rgba(255, 255, 255, 0.05)' 
+      : 'transparent',
+  opacity: isMinimized ? 0.7 : 1,
   '&:hover': {
-    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: isActive 
+      ? 'rgba(255, 255, 255, 0.2)' 
+      : 'rgba(255, 255, 255, 0.1)',
+    opacity: 1,
   },
 }));
 
@@ -78,7 +92,10 @@ interface TaskbarProps {
   onStartClick: () => void;
   openApps: App[];
   activeApp: string | null;
+  minimizedApps?: string[];
   onAppClick: (appId: string) => void;
+  position?: string;
+  size?: number;
 }
 
 const getIconComponent = (iconName: string) => {
@@ -102,7 +119,10 @@ const Taskbar: React.FC<TaskbarProps> = ({
   onStartClick, 
   openApps, 
   activeApp, 
-  onAppClick 
+  minimizedApps = [],
+  onAppClick,
+  position = 'bottom',
+  size = 48
 }) => {
   const { settings } = useContext(SettingsContext);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -144,43 +164,41 @@ const Taskbar: React.FC<TaskbarProps> = ({
     return date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  // タスクバーのスタイルを設定
+  const toolbarStyle = {
+    minHeight: size,
+    height: size,
+    padding: '0 8px',
+    ...(settings?.taskbarStyle === 'centered' && {
+      justifyContent: 'center',
+    }),
+  };
+
+  // アプリアイコンの表示方法を設定
+  const showAppNames = settings?.showAppNames !== false;
+
   return (
     <TaskbarContainer 
-      taskbarPosition={settings?.taskbarPosition || 'bottom'} 
-      size={settings?.taskbarSize || 48} 
+      taskbarPosition={position}
+      taskbarSize={size}
       useTransparency={settings?.useTransparency !== false}
     >
-      <Toolbar variant="dense" sx={{ 
-        justifyContent: settings?.taskbarStyle === 'centered' ? 'center' : 'flex-start',
-        minHeight: settings?.taskbarSize || 48,
-        padding: 0
-      }}>
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          width: '100%', 
-          maxWidth: 1200,
-          px: 1
-        }}>
+      <Toolbar variant="dense" sx={toolbarStyle}>
+        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', maxWidth: 1200 }}>
           <StartButton onClick={onStartClick}>
             <AppsIcon />
           </StartButton>
           
-          <Box sx={{ 
-            display: 'flex', 
-            overflowX: 'auto', 
-            flexGrow: 1,
-            justifyContent: settings?.taskbarStyle === 'centered' ? 'center' : 'flex-start'
-          }}>
+          <Box sx={{ display: 'flex', overflowX: 'auto', flexGrow: 1 }}>
             {openApps.map((app) => (
-              <Tooltip key={app.id} title={settings?.showAppNames ? '' : app.title}>
+              <Tooltip key={app.id} title={app.title}>
                 <TaskbarItem 
                   isActive={activeApp === app.id}
-                  showName={settings?.showAppNames !== false}
+                  isMinimized={minimizedApps.includes(app.id)}
                   onClick={() => onAppClick(app.id)}
                 >
                   {getIconComponent(app.icon)}
-                  {settings?.showAppNames !== false && (
+                  {showAppNames && (
                     <Typography variant="body2" sx={{ ml: 1 }}>
                       {app.title}
                     </Typography>
