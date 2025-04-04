@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,7 @@ func main() {
 	// CORS設定
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
@@ -54,6 +55,13 @@ func main() {
 		authorized.GET("/ws", handleWebSocket)
 	}
 
+	// ターミナルWebSocketエンドポイント - クエリパラメータでトークン認証
+	terminalGroup := r.Group("/api")
+	terminalGroup.Use(handlers.VerifyTokenFromQuery)
+	{
+		terminalGroup.GET("/terminal", handlers.HandleTerminalSession)
+	}
+
 	// 静的ファイルの提供 (Reactビルド後のファイル)
 	r.StaticFS("/app", http.Dir("./frontend/build"))
 
@@ -62,8 +70,14 @@ func main() {
 		c.File("./frontend/build/index.html")
 	})
 
-	log.Println("Server starting on :8080")
-	r.Run(":8080")
+	// ポート設定
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Println("Server starting on :" + port)
+	r.Run(":" + port)
 }
 
 func handleWebSocket(c *gin.Context) {
