@@ -1,10 +1,10 @@
 import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Terminal as XTerm } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
-import { WebLinksAddon } from 'xterm-addon-web-links';
-import 'xterm/css/xterm.css';
+import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { Terminal as XTerm } from '@xterm/xterm';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import '@xterm/xterm/css/xterm.css';
 import { useAuth } from '../contexts/AuthContext';
 import terminalService from '../services/terminal';
 
@@ -33,7 +33,9 @@ const TerminalContent = styled(Box)(({ theme }) => ({
   overflow: 'hidden',
 }));
 
+// メインコンポーネント
 const Terminal: React.FC = () => {
+  // 状態とref
   const { isAuthenticated } = useAuth();
   const terminalContainerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
@@ -42,10 +44,22 @@ const Terminal: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  // Terminal 初期化関数を useCallback でメモ化
+  // ターミナルのサイズを調整する関数
+  const fitTerminal = useCallback(() => {
+    if (fitAddonRef.current) {
+      try {
+        fitAddonRef.current.fit();
+        console.log('Terminal fitted');
+      } catch (e) {
+        console.error('Failed to fit terminal:', e);
+      }
+    }
+  }, []);
+
+  // ターミナル初期化関数
   const initializeTerminal = useCallback(() => {
     console.log('Initializing terminal...');
-
+    
     if (!terminalContainerRef.current) {
       console.error('Terminal container ref is null');
       setStatus('error');
@@ -60,7 +74,8 @@ const Terminal: React.FC = () => {
         xtermRef.current = null;
       }
 
-      const options = {
+      // ターミナルオプション
+      const terminal = new XTerm({
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         fontSize: 14,
         lineHeight: 1.2,
@@ -68,58 +83,74 @@ const Terminal: React.FC = () => {
         theme: {
           background: '#1e1e1e',
           foreground: '#f0f0f0',
+          cursor: '#ffffff',
+          selectionBackground: 'rgba(255, 255, 255, 0.3)',
+          black: '#000000',
+          red: '#e06c75',
+          green: '#98c379',
+          yellow: '#e5c07b',
+          blue: '#61afef',
+          magenta: '#c678dd',
+          cyan: '#56b6c2',
+          white: '#dcdfe4',
+          brightBlack: '#5c6370',
+          brightRed: '#e06c75',
+          brightGreen: '#98c379',
+          brightYellow: '#e5c07b',
+          brightBlue: '#61afef',
+          brightMagenta: '#c678dd',
+          brightCyan: '#56b6c2',
+          brightWhite: '#ffffff'
         },
         allowTransparency: true,
         scrollback: 1000,
         convertEol: true,
-      };
-
-      const terminal = new XTerm(options);
+        cursorStyle: 'block',
+      });
+      
       xtermRef.current = terminal;
 
-      // FitAddon と WebLinksAddon をロード
+      // アドオン追加
       const fitAddon = new FitAddon();
       fitAddonRef.current = fitAddon;
       terminal.loadAddon(fitAddon);
       terminal.loadAddon(new WebLinksAddon());
 
-      // DOM にターミナルを追加
+      // DOMに追加
       terminal.open(terminalContainerRef.current);
-
-      // 描画完了後にサイズチェックをして fit を実行
-      requestAnimationFrame(() => {
-        if (fitAddonRef.current && terminalContainerRef.current) {
-          const { offsetWidth, offsetHeight } = terminalContainerRef.current;
-          if (offsetWidth > 0 && offsetHeight > 0) {
-            try {
-              fitAddonRef.current?.fit();
-              console.log('Terminal fitted successfully');
-            } catch (e) {
-              console.error('Failed to fit terminal:', e);
-            }
-          } else {
-            console.warn('Terminal container has zero size');
-          }
-        }
-      });
-
-      // WebSocket 接続
+      
+      // 初期メッセージ
+      terminal.write('Connecting to terminal...\r\n');
+      
+      // 初期サイズ調整
+      setTimeout(() => {
+        fitTerminal();
+      }, 100);
+      
+      // WebSocket接続
       terminalService.connect(
         // データ受信
         (data) => {
-          xtermRef.current?.write(data);
+          if (xtermRef.current) {
+            xtermRef.current.write(data);
+          }
         },
         // 接続成功
         () => {
           setStatus('connected');
-          xtermRef.current?.focus();
-          terminalService.sendCommand('\r');
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+            // 初期コマンドを送信
+            terminalService.sendCommand('\r');
+          }
         },
         // 接続切断
         () => {
           setStatus('error');
           setErrorMessage('Connection closed. Please try again.');
-          xtermRef.current?.write('\r\n\x1b[31mConnection closed. Please try again.\x1b[0m\r\n');
+          if (xtermRef.current) {
+            xtermRef.current.write('\r\n\x1b[31mConnection closed. Please try again.\x1b[0m\r\n');
+          }
         }
       );
 
@@ -128,79 +159,87 @@ const Terminal: React.FC = () => {
         terminalService.sendCommand(data);
       });
 
-      // リサイズハンドラ
-      const handleResize = () => {
-        if (fitAddonRef.current) {
-          requestAnimationFrame(() => {
-            try {
-              fitAddonRef.current?.fit();
-            } catch (e) {
-              console.error('Failed to fit terminal on resize:', e);
-            }
-          });
-        }
-      };
-
-      window.addEventListener('resize', handleResize);
-
-      // ResizeObserver でコンテナサイズ変化を監視
-      const resizeObserver = new ResizeObserver(() => {
-        if (fitAddonRef.current) {
-          requestAnimationFrame(() => {
-            try {
-              fitAddonRef.current?.fit();
-            } catch (e) {
-              console.error('Failed to fit terminal on container resize:', e);
-            }
-          });
-        }
-      });
-      resizeObserver.observe(terminalContainerRef.current);
-
-      // タイムアウト処理（10秒以内に接続完了しなかった場合）
+      // タイムアウト処理
       const timeoutId = setTimeout(() => {
         if (status === 'loading') {
           setStatus('error');
           setErrorMessage('Connection timeout. Please check if the server is running.');
         }
-      }, 10000);
+      }, 5000); // 5秒に短縮
 
-      // クリーンアップ関数
+      // クリーンアップ関数を返す
       return () => {
-        window.removeEventListener('resize', handleResize);
         clearTimeout(timeoutId);
-        resizeObserver.disconnect();
         terminalService.disconnect();
-        xtermRef.current?.dispose();
-        xtermRef.current = null;
+        if (xtermRef.current) {
+          xtermRef.current.dispose();
+          xtermRef.current = null;
+        }
+        fitAddonRef.current = null;
       };
     } catch (err) {
       console.error('Error initializing terminal:', err);
       setStatus('error');
       setErrorMessage(`Failed to initialize terminal: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [status]); // status は timeout 内で参照しているため依存に含めています
+  }, [fitTerminal, status]);
 
   // 初期化処理
   useEffect(() => {
-    console.log('Terminal component mounted, authenticated:', isAuthenticated);
     if (!isAuthenticated) {
       setStatus('error');
       setErrorMessage('Authentication required');
       return;
     }
+
     const cleanup = initializeTerminal();
     return () => {
       if (cleanup) cleanup();
     };
   }, [isAuthenticated, retryCount, initializeTerminal]);
 
+  // リサイズイベントのリスナー
+  useEffect(() => {
+    const handleResize = () => {
+      // デバウンス処理
+      if (window.resizeTimeout) {
+        clearTimeout(window.resizeTimeout);
+      }
+      window.resizeTimeout = setTimeout(fitTerminal, 100);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    // クリーンアップ
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (window.resizeTimeout) {
+        clearTimeout(window.resizeTimeout);
+      }
+    };
+  }, [fitTerminal]);
+
   // 再試行ハンドラ
   const handleRetry = () => {
     setStatus('loading');
     setErrorMessage(null);
-    setRetryCount((prev) => prev + 1);
+    setRetryCount(prev => prev + 1);
   };
+
+  // キーボードショートカット
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+C のハンドリング
+      if (e.ctrlKey && e.key === 'c' && status === 'connected') {
+        terminalService.sendCommand('\x03'); // SIGINT
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [status]);
 
   return (
     <TerminalContainer>
@@ -212,21 +251,23 @@ const Terminal: React.FC = () => {
               width: 8,
               height: 8,
               borderRadius: '50%',
-              backgroundColor:
-                status === 'connected' ? 'success.main' : status === 'error' ? 'error.main' : 'warning.main',
-              mr: 1,
+              backgroundColor: 
+                status === 'connected' ? 'success.main' : 
+                status === 'error' ? 'error.main' : 'warning.main',
+              mr: 1
             }}
           />
           <Typography variant="caption">
-            {status === 'connected' ? 'Connected' : status === 'error' ? 'Error' : 'Connecting...'}
+            {status === 'connected' ? 'Connected' : 
+             status === 'error' ? 'Error' : 'Connecting...'}
           </Typography>
         </Box>
       </TerminalHeader>
 
       <TerminalContent>
         {status === 'loading' && (
-          <Box
-            sx={{
+          <Box 
+            sx={{ 
               position: 'absolute',
               top: 0,
               left: 0,
@@ -236,17 +277,17 @@ const Terminal: React.FC = () => {
               justifyContent: 'center',
               alignItems: 'center',
               backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              zIndex: 10,
+              zIndex: 10
             }}
           >
             <CircularProgress size={40} sx={{ mr: 2 }} />
             <Typography>Connecting to terminal...</Typography>
           </Box>
         )}
-
+        
         {status === 'error' && (
-          <Box
-            sx={{
+          <Box 
+            sx={{ 
               position: 'absolute',
               top: 0,
               left: 0,
@@ -257,31 +298,42 @@ const Terminal: React.FC = () => {
               justifyContent: 'center',
               alignItems: 'center',
               backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              zIndex: 10,
+              zIndex: 10
             }}
           >
             <Typography color="error.main" sx={{ mb: 2 }}>
               {errorMessage || 'An error occurred'}
             </Typography>
-            <Button variant="contained" color="primary" onClick={handleRetry}>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={handleRetry}
+            >
               Retry Connection
             </Button>
           </Box>
         )}
-
-        {/* ターミナルコンテナ */}
-        <div
+        
+        <div 
           ref={terminalContainerRef}
-          style={{
-            height: '100%',
+          style={{ 
+            height: '100%', 
             width: '100%',
             position: 'relative',
             overflow: 'hidden',
-          }}
+            padding: '2px'
+          }} 
         />
       </TerminalContent>
     </TerminalContainer>
   );
 };
+
+// TypeScriptの型拡張
+declare global {
+  interface Window {
+    resizeTimeout: ReturnType<typeof setTimeout> | null;
+  }
+}
 
 export default Terminal;
