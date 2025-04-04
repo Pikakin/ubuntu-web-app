@@ -9,6 +9,12 @@ body, html {
   box-sizing: border-box;
 }
 
+/* ダークモード対応 */
+body.dark-mode {
+  color: #ffffff;
+  background-color: #202020;
+}
+
 /* スクロールバーのスタイル */
 ::-webkit-scrollbar {
   width: 8px;
@@ -26,4 +32,84 @@ body, html {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.3);
+}
+
+/* ダークモード時のスクロールバー */
+body.dark-mode ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ウィンドウのアニメーション */
+.window-enter {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.window-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 200ms, transform 200ms;
+}
+
+.window-exit {
+  opacity: 1;
+}
+
+.window-exit-active {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 200ms, transform 200ms;
+}
+
+/* スタートメニューのアニメーション */
+.start-menu-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.start-menu-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms, transform 200ms;
+}
+
+.start-menu-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.start-menu-exit-active {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 200ms, transform 200ms;
+}
+
+/* タスクバーアイテムのアニメーション */
+.taskbar-item-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.taskbar-item-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 150ms, transform 150ms;
+}
+
+.taskbar-item-exit {
+  opacity: 1;
+}
+
+.taskbar-item-exit-active {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 150ms, transform 150ms;
 }

@@ -1,180 +1,339 @@
-import { Box, Paper, TextField, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React, { useState, useEffect, useRef } from 'react';
-import { executeCommand } from '../services/api';
+import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { Terminal as XTerm } from '@xterm/xterm';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import '@xterm/xterm/css/xterm.css';
+import { useAuth } from '../contexts/AuthContext';
+import terminalService from '../services/terminal';
 
+// スタイル定義
 const TerminalContainer = styled(Box)(({ theme }) => ({
+  height: '100%',
+  width: '100%',
   display: 'flex',
   flexDirection: 'column',
-  height: '100%',
   backgroundColor: '#1e1e1e',
   color: '#f0f0f0',
-  padding: theme.spacing(1),
-  fontFamily: 'monospace',
   overflow: 'hidden',
 }));
 
-const TerminalOutput = styled(Box)(({ theme }) => ({
-  flexGrow: 1,
-  overflowY: 'auto',
-  whiteSpace: 'pre-wrap',
+const TerminalHeader = styled(Box)(({ theme }) => ({
   padding: theme.spacing(1),
+  borderBottom: '1px solid #333',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
 }));
 
-const TerminalInput = styled(TextField)(({ theme }) => ({
-  '& .MuiInputBase-root': {
-    color: '#f0f0f0',
-    fontFamily: 'monospace',
-    fontSize: '1rem',
-  },
-  '& .MuiInput-underline:before': {
-    borderBottomColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  '& .MuiInput-underline:hover:not(.Mui-disabled):before': {
-    borderBottomColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  '& .MuiInput-underline:after': {
-    borderBottomColor: theme.palette.primary.main,
-  },
+const TerminalContent = styled(Box)(({ theme }) => ({
+  flexGrow: 1,
+  position: 'relative',
+  overflow: 'hidden',
 }));
 
-interface HistoryEntry {
-  command: string;
-  output: string;
-}
-
+// メインコンポーネント
 const Terminal: React.FC = () => {
-  const [input, setInput] = useState('');
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [commandHistory, setCommandHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const [loading, setLoading] = useState(false);
-  const outputRef = useRef<HTMLDivElement>(null);
+  // 状態とref
+  const { isAuthenticated } = useAuth();
+  const terminalContainerRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<XTerm | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const [status, setStatus] = useState<'loading' | 'connected' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // 初期メッセージ
-  useEffect(() => {
-    setHistory([
-      {
-        command: '',
-        output: 'Welcome to Ubuntu Web Terminal\nType "help" for available commands.\n'
+  // ターミナルのサイズを調整する関数
+  const fitTerminal = useCallback(() => {
+    if (fitAddonRef.current) {
+      try {
+        fitAddonRef.current.fit();
+        console.log('Terminal fitted');
+      } catch (e) {
+        console.error('Failed to fit terminal:', e);
       }
-    ]);
+    }
   }, []);
 
-  // 出力が更新されたらスクロールを一番下に
-  useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
-    }
-  }, [history]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // 上下キーでコマンド履歴を操作
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (commandHistory.length > 0 && historyIndex < commandHistory.length - 1) {
-        const newIndex = historyIndex + 1;
-        setHistoryIndex(newIndex);
-        setInput(commandHistory[commandHistory.length - 1 - newIndex]);
-      }
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (historyIndex > 0) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setInput(commandHistory[commandHistory.length - 1 - newIndex]);
-      } else if (historyIndex === 0) {
-        setHistoryIndex(-1);
-        setInput('');
-      }
-    } else if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleCommand();
-    }
-  };
-
-  const handleCommand = async () => {
-    if (!input.trim()) return;
-
-    const command = input.trim();
-    setInput('');
-    setHistoryIndex(-1);
+  // ターミナル初期化関数
+  const initializeTerminal = useCallback(() => {
+    console.log('Initializing terminal...');
     
-    // コマンド履歴に追加
-    setCommandHistory(prev => [...prev, command]);
-    
-    // 特殊コマンドの処理
-    if (command === 'clear') {
-      setHistory([]);
+    if (!terminalContainerRef.current) {
+      console.error('Terminal container ref is null');
+      setStatus('error');
+      setErrorMessage('Terminal container not found');
       return;
     }
-    
-    if (command === 'help') {
-      setHistory(prev => [...prev, {
-        command,
-        output: `Available commands:
-- help: Show this help message
-- clear: Clear the terminal
-- Any valid bash command
-`
-      }]);
-      return;
-    }
-    
-    // 通常のコマンド実行
-    setLoading(true);
+
     try {
-      const output = await executeCommand(command);
-      setHistory(prev => [...prev, { command, output }]);
-    } catch (error) {
-      let errorMessage = 'Command execution failed';
-      if (error instanceof Error) {
-        errorMessage = error.message;
+      // 既存のターミナルがあれば破棄
+      if (xtermRef.current) {
+        xtermRef.current.dispose();
+        xtermRef.current = null;
       }
-      setHistory(prev => [...prev, { command, output: `Error: ${errorMessage}` }]);
-    } finally {
-      setLoading(false);
+
+      // ターミナルオプション
+      const terminal = new XTerm({
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        fontSize: 14,
+        lineHeight: 1.2,
+        cursorBlink: true,
+        theme: {
+          background: '#1e1e1e',
+          foreground: '#f0f0f0',
+          cursor: '#ffffff',
+          selectionBackground: 'rgba(255, 255, 255, 0.3)',
+          black: '#000000',
+          red: '#e06c75',
+          green: '#98c379',
+          yellow: '#e5c07b',
+          blue: '#61afef',
+          magenta: '#c678dd',
+          cyan: '#56b6c2',
+          white: '#dcdfe4',
+          brightBlack: '#5c6370',
+          brightRed: '#e06c75',
+          brightGreen: '#98c379',
+          brightYellow: '#e5c07b',
+          brightBlue: '#61afef',
+          brightMagenta: '#c678dd',
+          brightCyan: '#56b6c2',
+          brightWhite: '#ffffff'
+        },
+        allowTransparency: true,
+        scrollback: 1000,
+        convertEol: true,
+        cursorStyle: 'block',
+      });
+      
+      xtermRef.current = terminal;
+
+      // アドオン追加
+      const fitAddon = new FitAddon();
+      fitAddonRef.current = fitAddon;
+      terminal.loadAddon(fitAddon);
+      terminal.loadAddon(new WebLinksAddon());
+
+      // DOMに追加
+      terminal.open(terminalContainerRef.current);
+      
+      // 初期メッセージ
+      terminal.write('Connecting to terminal...\r\n');
+      
+      // 初期サイズ調整
+      setTimeout(() => {
+        fitTerminal();
+      }, 100);
+      
+      // WebSocket接続
+      terminalService.connect(
+        // データ受信
+        (data) => {
+          if (xtermRef.current) {
+            xtermRef.current.write(data);
+          }
+        },
+        // 接続成功
+        () => {
+          setStatus('connected');
+          if (xtermRef.current) {
+            xtermRef.current.focus();
+            // 初期コマンドを送信
+            terminalService.sendCommand('\r');
+          }
+        },
+        // 接続切断
+        () => {
+          setStatus('error');
+          setErrorMessage('Connection closed. Please try again.');
+          if (xtermRef.current) {
+            xtermRef.current.write('\r\n\x1b[31mConnection closed. Please try again.\x1b[0m\r\n');
+          }
+        }
+      );
+
+      // ユーザー入力処理
+      terminal.onData((data) => {
+        terminalService.sendCommand(data);
+      });
+
+      // タイムアウト処理
+      const timeoutId = setTimeout(() => {
+        if (status === 'loading') {
+          setStatus('error');
+          setErrorMessage('Connection timeout. Please check if the server is running.');
+        }
+      }, 5000); // 5秒に短縮
+
+      // クリーンアップ関数を返す
+      return () => {
+        clearTimeout(timeoutId);
+        terminalService.disconnect();
+        if (xtermRef.current) {
+          xtermRef.current.dispose();
+          xtermRef.current = null;
+        }
+        fitAddonRef.current = null;
+      };
+    } catch (err) {
+      console.error('Error initializing terminal:', err);
+      setStatus('error');
+      setErrorMessage(`Failed to initialize terminal: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }, [fitTerminal, status]);
+
+  // 初期化処理
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setStatus('error');
+      setErrorMessage('Authentication required');
+      return;
+    }
+
+    const cleanup = initializeTerminal();
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [isAuthenticated, retryCount, initializeTerminal]);
+
+  // リサイズイベントのリスナー
+  useEffect(() => {
+    const handleResize = () => {
+      // デバウンス処理
+      if (window.resizeTimeout) {
+        clearTimeout(window.resizeTimeout);
+      }
+      window.resizeTimeout = setTimeout(fitTerminal, 100);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    // クリーンアップ
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (window.resizeTimeout) {
+        clearTimeout(window.resizeTimeout);
+      }
+    };
+  }, [fitTerminal]);
+
+  // 再試行ハンドラ
+  const handleRetry = () => {
+    setStatus('loading');
+    setErrorMessage(null);
+    setRetryCount(prev => prev + 1);
   };
+
+  // キーボードショートカット
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+C のハンドリング
+      if (e.ctrlKey && e.key === 'c' && status === 'connected') {
+        terminalService.sendCommand('\x03'); // SIGINT
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [status]);
 
   return (
     <TerminalContainer>
-      <TerminalOutput ref={outputRef}>
-        {history.map((entry, index) => (
-          <Box key={index}>
-            {entry.command && (
-              <Typography component="div" sx={{ color: '#4CAF50' }}>
-                user@ubuntu:~$ {entry.command}
-              </Typography>
-            )}
-            <Typography component="div" sx={{ mb: 1, whiteSpace: 'pre-wrap' }}>
-              {entry.output}
-            </Typography>
+      <TerminalHeader>
+        <Typography variant="subtitle1">Terminal</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: 
+                status === 'connected' ? 'success.main' : 
+                status === 'error' ? 'error.main' : 'warning.main',
+              mr: 1
+            }}
+          />
+          <Typography variant="caption">
+            {status === 'connected' ? 'Connected' : 
+             status === 'error' ? 'Error' : 'Connecting...'}
+          </Typography>
+        </Box>
+      </TerminalHeader>
+
+      <TerminalContent>
+        {status === 'loading' && (
+          <Box 
+            sx={{ 
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              zIndex: 10
+            }}
+          >
+            <CircularProgress size={40} sx={{ mr: 2 }} />
+            <Typography>Connecting to terminal...</Typography>
           </Box>
-        ))}
-        {loading && <Typography>Executing command...</Typography>}
-      </TerminalOutput>
-      
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <Typography sx={{ color: '#4CAF50', mr: 1 }}>
-          user@ubuntu:~$
-        </Typography>
-        <TerminalInput
-          fullWidth
-          variant="standard"
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          disabled={loading}
-          autoFocus
+        )}
+        
+        {status === 'error' && (
+          <Box 
+            sx={{ 
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              zIndex: 10
+            }}
+          >
+            <Typography color="error.main" sx={{ mb: 2 }}>
+              {errorMessage || 'An error occurred'}
+            </Typography>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={handleRetry}
+            >
+              Retry Connection
+            </Button>
+          </Box>
+        )}
+        
+        <div 
+          ref={terminalContainerRef}
+          style={{ 
+            height: '100%', 
+            width: '100%',
+            position: 'relative',
+            overflow: 'hidden',
+            padding: '2px'
+          }} 
         />
-      </Box>
+      </TerminalContent>
     </TerminalContainer>
   );
 };
+
+// TypeScriptの型拡張
+declare global {
+  interface Window {
+    resizeTimeout: ReturnType<typeof setTimeout> | null;
+  }
+}
 
 export default Terminal;
