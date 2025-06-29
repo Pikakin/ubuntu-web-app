@@ -1,306 +1,284 @@
-import CloseIcon from '@mui/icons-material/Close';
-import CloseFullscreenIcon from '@mui/icons-material/CloseFullscreen';
-import MinimizeIcon from '@mui/icons-material/Minimize';
-import OpenInFullIcon from '@mui/icons-material/OpenInFull';
-import { Box, IconButton, Paper, Typography } from '@mui/material';
+import React, { useState, useRef } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  IconButton,
+  AppBar,
+  Toolbar
+} from '@mui/material';
+import {
+  Close as CloseIcon,
+  Minimize as MinimizeIcon,
+  CropSquare as MaximizeIcon,
+  FilterNone as RestoreIcon
+} from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
-import React, { useState, useRef, useEffect, useContext } from 'react';
 import Draggable from 'react-draggable';
-import { Resizable } from 'react-resizable';
-import 'react-resizable/css/styles.css';
-import { SettingsContext } from '../contexts/SettingsContext';
-
-// リサイズハンドルのスタイル
-const ResizeHandle = styled(Box)(({ theme }) => ({
-  position: 'absolute',
-  width: 10,
-  height: 10,
-  background: 'transparent',
-  border: 'none',
-  '&.bottom-right': {
-    bottom: 0,
-    right: 0,
-    cursor: 'nwse-resize',
-  },
-}));
 
 const WindowContainer = styled(Paper, {
   shouldForwardProp: (prop) => 
-    prop !== 'isActive' && 
-    prop !== 'isMaximized' && 
-    prop !== 'useTransparency' && 
-    prop !== 'isMinimized'
+    !['isActive', 'isMaximized', 'isMinimized'].includes(prop as string)
 })<{ 
   isActive: boolean; 
   isMaximized: boolean; 
-  useTransparency?: boolean;
   isMinimized: boolean;
-}>(({ theme, isActive, isMaximized, useTransparency, isMinimized }) => ({
+}>(({ theme, isActive, isMaximized, isMinimized }) => ({
   position: 'absolute',
-  display: 'flex',
+  minWidth: 400,
+  minHeight: 300,
+  display: isMinimized ? 'none' : 'flex',
   flexDirection: 'column',
+  backgroundColor: theme.palette.background.paper,
+  border: `2px solid ${isActive ? theme.palette.primary.main : theme.palette.divider}`,
+  borderRadius: isMaximized ? 0 : 8,
   boxShadow: isActive 
-    ? '0 10px 25px rgba(0, 0, 0, 0.3)' 
-    : '0 5px 15px rgba(0, 0, 0, 0.1)',
-  border: isActive 
-    ? `1px solid ${theme.palette.primary.main}` 
-    : '1px solid rgba(0, 0, 0, 0.1)',
-  borderRadius: 4,
-  overflow: 'hidden',
-  zIndex: isActive ? 100 : 10,
-  backgroundColor: useTransparency 
-    ? (theme.palette.mode === 'dark' ? 'rgba(48, 48, 48, 0.9)' : 'rgba(255, 255, 255, 0.9)')
-    : theme.palette.background.paper,
-  backdropFilter: useTransparency ? 'blur(10px)' : 'none',
+    ? theme.shadows[8] 
+    : theme.shadows[4],
+  zIndex: isActive ? 1000 : 100,
   ...(isMaximized && {
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 48, // タスクバーの高さ
-    width: '100%',
-    height: 'calc(100vh - 48px)',
+    top: '0 !important',
+    left: '0 !important',
+    width: '100vw !important',
+    height: 'calc(100vh - 48px) !important',
     transform: 'none !important',
-  }),
-  ...(isMaximized === false && isMinimized === false && {
-    width: 800,
-    height: 600,
-  }),
-  ...(isMinimized && {
-    display: 'none',
   }),
 }));
 
-const WindowTitleBar = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'isActive'
-})<{ isActive: boolean }>(({ theme, isActive }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  padding: '4px 8px',
-  backgroundColor: isActive 
-    ? theme.palette.primary.main 
-    : theme.palette.grey[300],
-  color: isActive ? theme.palette.primary.contrastText : theme.palette.text.primary,
+const WindowHeader = styled(AppBar)(({ theme }) => ({
   cursor: 'move',
-  userSelect: 'none',
+  backgroundColor: theme.palette.primary.main,
+  '&:hover': {
+    backgroundColor: theme.palette.primary.dark,
+  },
 }));
 
 const WindowContent = styled(Box)(({ theme }) => ({
-  flexGrow: 1,
+  flex: 1,
   overflow: 'auto',
-  backgroundColor: 'transparent',
-  height: '100%',
-  width: '100%',
+  backgroundColor: theme.palette.background.default,
 }));
+
+const ResizeHandle = styled(Box)(({ theme }) => ({
+  position: 'absolute',
+  backgroundColor: 'transparent',
+  '&:hover': {
+    backgroundColor: theme.palette.primary.main,
+    opacity: 0.3,
+  },
+}));
+
+const ResizeHandles = {
+  'nw': { top: 0, left: 0, width: 10, height: 10, cursor: 'nw-resize' },
+  'ne': { top: 0, right: 0, width: 10, height: 10, cursor: 'ne-resize' },
+  'sw': { bottom: 0, left: 0, width: 10, height: 10, cursor: 'sw-resize' },
+  'se': { bottom: 0, right: 0, width: 10, height: 10, cursor: 'se-resize' },
+  'n': { top: 0, left: 10, right: 10, height: 5, cursor: 'n-resize' },
+  's': { bottom: 0, left: 10, right: 10, height: 5, cursor: 's-resize' },
+  'w': { left: 0, top: 10, bottom: 10, width: 5, cursor: 'w-resize' },
+  'e': { right: 0, top: 10, bottom: 10, width: 5, cursor: 'e-resize' },
+};
 
 interface WindowProps {
   id: string;
   title: string;
   children: React.ReactNode;
   isActive: boolean;
+  isMinimized?: boolean;
   onClose: () => void;
   onFocus: () => void;
-  onMinimize?: (id: string) => void;
+  onMinimize: (id: string) => void;
 }
 
-const Window: React.FC<WindowProps> = ({ 
-  id, 
-  title, 
-  children, 
-  isActive, 
-  onClose, 
+const Window: React.FC<WindowProps> = ({
+  id,
+  title,
+  children,
+  isActive,
+  isMinimized = false,
+  onClose,
   onFocus,
-  onMinimize
+  onMinimize,
 }) => {
-  const { settings } = useContext(SettingsContext);
-  const [position, setPosition] = useState({ x: 50, y: 50 });
   const [isMaximized, setIsMaximized] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [prevPosition, setPrevPosition] = useState({ x: 50, y: 50 });
-  const [size, setSize] = useState({ width: 800, height: 600 });
-  const [prevSize, setPrevSize] = useState({ width: 800, height: 600 });
-  const nodeRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
+  const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
+  const [windowPosition, setWindowPosition] = useState({ 
+    x: Math.random() * 200 + 100,
+    y: Math.random() * 200 + 100 
+  });
+  const [previousState, setPreviousState] = useState({ 
+    size: { width: 800, height: 600 }, 
+    position: { x: 100, y: 100 } 
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState<string | null>(null);
+  
+  const dragRef = useRef<HTMLDivElement>(null);
 
-  // ランダムな初期位置を設定
-  useEffect(() => {
-    const randomX = Math.floor(Math.random() * 200);
-    const randomY = Math.floor(Math.random() * 100);
-    setPosition({ x: randomX, y: randomY });
-    setPrevPosition({ x: randomX, y: randomY });
-  }, []);
-
-  const handleDragStop = (e: any, data: { x: number; y: number }) => {
-    if (!isMaximized) {
-      setPosition({ x: data.x, y: data.y });
-      setPrevPosition({ x: data.x, y: data.y });
+  const handleWindowClick = () => {
+    if (!isActive) {
+      onFocus();
     }
-  };
-
-  const toggleMaximize = () => {
-    if (isMaximized) {
-      setIsMaximized(false);
-      setPosition(prevPosition);
-      setSize(prevSize);
-    } else {
-      setPrevPosition(position);
-      setPrevSize(size);
-      setIsMaximized(true);
-    }
-    
-    // リサイズイベントを発火して子コンポーネントに通知
-    setTimeout(() => {
-      window.dispatchEvent(new Event('resize'));
-    }, 100);
   };
 
   const handleMinimize = () => {
-    setIsMinimized(true);
-    if (onMinimize) {
-      onMinimize(id);
+    onMinimize(id);
+  };
+
+  const handleMaximize = () => {
+    if (isMaximized) {
+      setIsMaximized(false);
+      setWindowSize(previousState.size);
+      setWindowPosition(previousState.position);
+    } else {
+      setPreviousState({
+        size: windowSize,
+        position: windowPosition
+      });
+      setIsMaximized(true);
     }
   };
 
-  // タスクバーからの復元
-  useEffect(() => {
-    if (isActive && isMinimized) {
-      setIsMinimized(false);
-    }
-  }, [isActive, isMinimized]);
+  const handleHeaderDoubleClick = () => {
+    handleMaximize();
+  };
 
-  // リサイズハンドラ
-  const onResize = (event: React.SyntheticEvent, { size }: { size: { width: number; height: number } }) => {
-    if (!isMaximized) {
-      setSize({ width: size.width, height: size.height });
+  const handleResizeStart = (direction: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isMaximized) return;
+    
+    setIsResizing(true);
+    setResizeDirection(direction);
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = windowSize.width;
+    const startHeight = windowSize.height;
+    const startLeft = windowPosition.x;
+    const startTop = windowPosition.y;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
       
-      // リサイズイベントを発火して子コンポーネントに通知
-      setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-      }, 100);
-    }
+      let newWidth = startWidth;
+      let newHeight = startHeight;
+      let newLeft = startLeft;
+      let newTop = startTop;
+
+      if (direction.includes('e')) {
+        newWidth = Math.max(400, startWidth + deltaX);
+      }
+      if (direction.includes('w')) {
+        newWidth = Math.max(400, startWidth - deltaX);
+        newLeft = startLeft + (startWidth - newWidth);
+      }
+      if (direction.includes('s')) {
+        newHeight = Math.max(300, startHeight + deltaY);
+      }
+      if (direction.includes('n')) {
+        newHeight = Math.max(300, startHeight - deltaY);
+        newTop = startTop + (startHeight - newHeight);
+      }
+
+      setWindowSize({ width: newWidth, height: newHeight });
+      setWindowPosition({ x: newLeft, y: newTop });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      setResizeDirection(null);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
-  // リサイズ可能なウィンドウをレンダリング
-  const renderResizableWindow = () => {
-    return (
-      <Resizable
-        width={size.width}
-        height={size.height}
-        onResize={onResize}
-        handle={
-          <ResizeHandle className="bottom-right" />
-        }
-        resizeHandles={['se']}
-        minConstraints={[300, 200]}
-        maxConstraints={[window.innerWidth - 50, window.innerHeight - 100]}
-      >
-        <WindowContainer
-          ref={nodeRef}
-          isActive={isActive}
-          isMaximized={isMaximized}
-          isMinimized={isMinimized}
-          useTransparency={settings?.useTransparency !== false}
-          onClick={onFocus}
-          style={{ width: size.width, height: size.height }}
-        >
-          <WindowTitleBar className="window-title-bar" isActive={isActive}>
-            <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
-              {title}
-            </Typography>
-            <IconButton 
-              size="small" 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMinimize();
-              }}
-              sx={{ color: 'inherit' }}
-            >
-              <MinimizeIcon fontSize="small" />
-            </IconButton>
-            <IconButton 
-              size="small" 
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleMaximize();
-              }}
-              sx={{ color: 'inherit' }}
-            >
-              {isMaximized ? <CloseFullscreenIcon fontSize="small" /> : <OpenInFullIcon fontSize="small" />}
-            </IconButton>
-            <IconButton 
-              size="small" 
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              sx={{ color: 'inherit' }}
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </WindowTitleBar>
-          <WindowContent>
-            {children}
-          </WindowContent>
-        </WindowContainer>
-      </Resizable>
-    );
+  const handleDrag = (e: any, data: any) => {
+    if (!isMaximized) {
+      setWindowPosition({ x: data.x, y: data.y });
+    }
   };
 
   return (
     <Draggable
-      nodeRef={nodeRef}
-      handle=".window-title-bar"
-      position={isMaximized ? { x: 0, y: 0 } : position}
-      onStop={handleDragStop}
+      handle=".window-header"
+      position={isMaximized ? { x: 0, y: 0 } : windowPosition}
+      onDrag={handleDrag}
       disabled={isMaximized}
+      nodeRef={dragRef as React.RefObject<HTMLElement>}
     >
-      {isMaximized ? (
+      <div ref={dragRef}>
         <WindowContainer
-          ref={nodeRef}
           isActive={isActive}
           isMaximized={isMaximized}
           isMinimized={isMinimized}
-          useTransparency={settings?.useTransparency !== false}
-          onClick={onFocus}
+          onClick={handleWindowClick}
+          style={{
+            width: isMaximized ? '100vw' : windowSize.width,
+            height: isMaximized ? 'calc(100vh - 48px)' : windowSize.height,
+          }}
         >
-          <WindowTitleBar className="window-title-bar" isActive={isActive}>
-            <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
-              {title}
-            </Typography>
-            <IconButton 
-              size="small" 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleMinimize();
-              }}
-              sx={{ color: 'inherit' }}
-            >
-              <MinimizeIcon fontSize="small" />
-            </IconButton>
-            <IconButton 
-              size="small" 
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleMaximize();
-              }}
-              sx={{ color: 'inherit' }}
-            >
-              <CloseFullscreenIcon fontSize="small" />
-            </IconButton>
-            <IconButton 
-              size="small" 
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              sx={{ color: 'inherit' }}
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </WindowTitleBar>
+          <WindowHeader 
+            position="static" 
+            className="window-header"
+            onDoubleClick={handleHeaderDoubleClick}
+          >
+            <Toolbar variant="dense" sx={{ minHeight: 40, pr: 1 }}>
+              <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontSize: '0.9rem' }}>
+                {title}
+              </Typography>
+              
+              <IconButton
+                size="small"
+                onClick={handleMinimize}
+                sx={{ color: 'white', mr: 0.5 }}
+              >
+                <MinimizeIcon fontSize="small" />
+              </IconButton>
+              
+              <IconButton
+                size="small"
+                onClick={handleMaximize}
+                sx={{ color: 'white', mr: 0.5 }}
+              >
+                {isMaximized ? <RestoreIcon fontSize="small" /> : <MaximizeIcon fontSize="small" />}
+              </IconButton>
+              
+              <IconButton
+                size="small"
+                onClick={onClose}
+                sx={{ color: 'white' }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Toolbar>
+          </WindowHeader>
+
           <WindowContent>
             {children}
           </WindowContent>
+
+          {!isMaximized && (
+            <>
+              {Object.entries(ResizeHandles).map(([direction, style]) => (
+                <ResizeHandle
+                  key={direction}
+                  sx={{
+                    ...style,
+                    cursor: isResizing && resizeDirection === direction ? style.cursor : style.cursor,
+                  }}
+                  onMouseDown={handleResizeStart(direction)}
+                />
+              ))}
+            </>
+          )}
         </WindowContainer>
-      ) : renderResizableWindow()}
+      </div>
     </Draggable>
   );
 };

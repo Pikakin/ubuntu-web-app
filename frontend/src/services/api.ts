@@ -1,16 +1,31 @@
+// 修正: 認証ヘッダーを統一するためのaxiosインスタンス作成
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8080/api';
+
+// 修正: axiosインスタンスを作成して認証ヘッダーを自動付与
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+});
+
+// 修正: リクエストインターセプターで認証トークンを自動付与
+apiClient.interceptors.request.use((config) => {
+  const token = getAuthToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 // 認証トークンを取得する関数
 const getAuthToken = () => {
   return localStorage.getItem('auth_token');
 };
 
-// ログイン処理
+// 修正: ログイン処理のURL修正
 export const login = async (username: string, password: string): Promise<boolean> => {
   try {
-    const response = await axios.post(`${API_BASE_URL.replace('/api', '')}/api/auth/login`, { 
+    const response = await axios.post(`http://localhost:8080/api/auth/login`, { 
       username, 
       password 
     });
@@ -27,15 +42,10 @@ export const login = async (username: string, password: string): Promise<boolean
   }
 };
 
-// システム情報を取得
+// 修正: apiClientを使用するように変更
 export const fetchSystemInfo = async (): Promise<string> => {
   try {
-    const token = getAuthToken();
-    const response = await axios.get(`${API_BASE_URL}/system/info`, {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : ''
-      }
-    });
+    const response = await apiClient.get('/system/info');
     
     // レスポンスの形式に合わせて整形
     const { hostname, kernel, os } = response.data;

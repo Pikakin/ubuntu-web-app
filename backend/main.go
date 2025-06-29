@@ -55,6 +55,17 @@ func main() {
 		authorized.GET("/ws", handleWebSocket)
 	}
 
+	// ユーザー管理API - 認証が必要
+	userHandler := handlers.NewUserHandler()
+	userRoutes := authorized.Group("/users")  // 修正: authorizedグループ内に移動
+	{
+		userRoutes.GET("", userHandler.GetUsers)
+		userRoutes.POST("", userHandler.CreateUser)
+		userRoutes.PUT("/:username", userHandler.UpdateUser)
+		userRoutes.DELETE("/:username", userHandler.DeleteUser)
+		userRoutes.POST("/change-password", userHandler.ChangePassword)
+	}
+
 	// ターミナルWebSocketエンドポイント - クエリパラメータでトークン認証
 	terminalGroup := r.Group("/api")
 	terminalGroup.Use(handlers.VerifyTokenFromQuery)

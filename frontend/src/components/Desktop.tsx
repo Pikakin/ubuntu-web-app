@@ -1,6 +1,6 @@
+import React, { useState, useEffect, useContext } from 'react';
 import { Box, Grid } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React, { useState, useEffect, useContext } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { SettingsContext } from '../contexts/SettingsContext';
 import { fetchSystemInfo } from '../services/api';
@@ -8,6 +8,7 @@ import Dashboard from './Dashboard';
 import DesktopIcon from './DesktopIcon';
 import FileExplorer from './FileExplorer';
 import ServiceMonitor from './ServiceMonitor';
+import { UserManager } from './UserManager';
 import Settings from './Settings';
 import StartMenu from './StartMenu';
 import Taskbar from './Taskbar';
@@ -31,15 +32,15 @@ const DesktopContainer = styled(Box, {
 const DesktopArea = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'taskbarPosition' && prop !== 'taskbarSize'
 })<{ taskbarPosition: string; taskbarSize: number }>(({ theme, taskbarPosition, taskbarSize }) => ({
-  flexGrow: 1,
+  flex: 1,
   padding: theme.spacing(2),
   position: 'relative',
-  overflowY: 'auto',
+  overflow: 'hidden',
   ...(taskbarPosition === 'bottom' && {
-    paddingBottom: taskbarSize + theme.spacing(2),
+    height: `calc(100vh - ${taskbarSize}px)`,
   }),
   ...(taskbarPosition === 'top' && {
-    paddingTop: taskbarSize + theme.spacing(2),
+    height: `calc(100vh - ${taskbarSize}px)`,
   }),
 }));
 
@@ -56,6 +57,7 @@ const Desktop: React.FC = () => {
   const [openWindows, setOpenWindows] = useState<string[]>([]);
   const [minimizedWindows, setMinimizedWindows] = useState<string[]>([]);
   const [activeWindow, setActiveWindow] = useState<string | null>(null);
+  const [windowStack, setWindowStack] = useState<string[]>([]);
   const [systemInfo, setSystemInfo] = useState<string>('');
   const { user, logout } = useAuth();
 
@@ -104,8 +106,14 @@ const Desktop: React.FC = () => {
     {
       id: 'service-monitor',
       title: 'Service Monitor',
-      icon: 'settings',
+      icon: 'monitoring',
       component: <ServiceMonitor />,
+    },
+    {
+      id: 'user-manager',
+      title: 'User Manager',
+      icon: 'people',
+      component: <UserManager />,
     },
     {
       id: 'settings',
@@ -119,49 +127,61 @@ const Desktop: React.FC = () => {
     setStartMenuOpen(!startMenuOpen);
   };
 
-  const openApp = (appId: string) => {
-    if (!openWindows.includes(appId)) {
-      setOpenWindows([...openWindows, appId]);
+  const activateWindow = (appId: string) => {
+    if (minimizedWindows.includes(appId)) {
+      setMinimizedWindows(prev => prev.filter(id => id !== appId));
     }
     
-    // アプリが最小化されていた場合、最小化リストから削除
-    if (minimizedWindows.includes(appId)) {
-      setMinimizedWindows(minimizedWindows.filter(id => id !== appId));
+    setWindowStack(prev => {
+      const newStack = prev.filter(id => id !== appId);
+      return [...newStack, appId];
+    });
+    
+    setActiveWindow(appId);
+  };
+
+  const openApp = (appId: string) => {
+    if (!openWindows.includes(appId)) {
+      setOpenWindows(prev => [...prev, appId]);
+      setWindowStack(prev => [...prev, appId]);
     }
+    
+    if (minimizedWindows.includes(appId)) {
+      setMinimizedWindows(prev => prev.filter(id => id !== appId));
+    }
+    
+    setWindowStack(prev => {
+      const newStack = prev.filter(id => id !== appId);
+      return [...newStack, appId];
+    });
     
     setActiveWindow(appId);
     setStartMenuOpen(false);
   };
 
   const closeApp = (appId: string) => {
-    setOpenWindows(openWindows.filter(id => id !== appId));
-    setMinimizedWindows(minimizedWindows.filter(id => id !== appId));
+    setOpenWindows(prev => prev.filter(id => id !== appId));
+    setMinimizedWindows(prev => prev.filter(id => id !== appId));
+    setWindowStack(prev => prev.filter(id => id !== appId));
     
     if (activeWindow === appId) {
-      // 閉じたウィンドウがアクティブだった場合、次のウィンドウをアクティブにする
-      const remainingWindows = openWindows.filter(id => id !== appId && !minimizedWindows.includes(id));
-      setActiveWindow(remainingWindows.length > 0 ? remainingWindows[0] : null);
+      const remainingWindows = windowStack.filter(id => 
+        id !== appId && openWindows.includes(id) && !minimizedWindows.includes(id)
+      );
+      setActiveWindow(remainingWindows.length > 0 ? remainingWindows[remainingWindows.length - 1] : null);
     }
-  };
-
-  const activateWindow = (appId: string) => {
-    // 最小化されていたウィンドウを復元
-    if (minimizedWindows.includes(appId)) {
-      setMinimizedWindows(minimizedWindows.filter(id => id !== appId));
-    }
-    
-    setActiveWindow(appId);
   };
 
   const minimizeWindow = (appId: string) => {
     if (!minimizedWindows.includes(appId)) {
-      setMinimizedWindows([...minimizedWindows, appId]);
+      setMinimizedWindows(prev => [...prev, appId]);
     }
     
-    // 最小化したウィンドウがアクティブだった場合、次のウィンドウをアクティブにする
     if (activeWindow === appId) {
-      const visibleWindows = openWindows.filter(id => !minimizedWindows.includes(id) && id !== appId);
-      setActiveWindow(visibleWindows.length > 0 ? visibleWindows[0] : null);
+      const visibleWindows = windowStack.filter((id: string) => 
+        openWindows.includes(id) && !minimizedWindows.includes(id) && id !== appId
+      );
+      setActiveWindow(visibleWindows.length > 0 ? visibleWindows[visibleWindows.length - 1] : null);
     }
   };
 
@@ -169,7 +189,6 @@ const Desktop: React.FC = () => {
     logout();
   };
 
-  // 設定からウォールペーパーとタスクバーの位置を取得
   const wallpaper = settings?.wallpaper || 'default';
   const taskbarPosition = settings?.taskbarPosition || 'bottom';
   const taskbarSize = settings?.taskbarSize || 48;
@@ -177,9 +196,9 @@ const Desktop: React.FC = () => {
   return (
     <DesktopContainer wallpaper={wallpaper}>
       <DesktopArea taskbarPosition={taskbarPosition} taskbarSize={taskbarSize}>
-        <Grid container spacing={2} style={{ marginTop: 10 }}>
+        <Grid container spacing={2} sx={{ mt: 1 }}>
           {apps.map((app) => (
-            <Grid component="div" key={app.id}>
+            <Grid key={`desktop-icon-${app.id}`} size="auto">
               <DesktopIcon
                 title={app.title}
                 icon={app.icon}
@@ -189,22 +208,26 @@ const Desktop: React.FC = () => {
           ))}
         </Grid>
 
-        {openWindows.map((appId) => {
+        {openWindows.map((appId: string) => {
           const app = apps.find(a => a.id === appId);
           if (!app) return null;
           
+          const zIndex = 100 + windowStack.indexOf(appId);
+          
           return (
-            <Window
-              key={app.id}
-              id={app.id}
-              title={app.title}
-              isActive={activeWindow === app.id}
-              onClose={() => closeApp(app.id)}
-              onFocus={() => activateWindow(app.id)}
-              onMinimize={minimizeWindow}
-            >
-              {app.component}
-            </Window>
+            <div key={`window-${app.id}`} style={{ zIndex }}>
+              <Window
+                id={app.id}
+                title={app.title}
+                isActive={activeWindow === app.id}
+                isMinimized={minimizedWindows.includes(app.id)}
+                onClose={() => closeApp(app.id)}
+                onFocus={() => activateWindow(app.id)}
+                onMinimize={minimizeWindow}
+              >
+                {app.component}
+              </Window>
+            </div>
           );
         })}
       </DesktopArea>
@@ -221,7 +244,7 @@ const Desktop: React.FC = () => {
 
       <Taskbar 
         onStartClick={toggleStartMenu} 
-        openApps={openWindows.map(id => apps.find(app => app.id === id)!)}
+        openApps={openWindows.map(id => apps.find(app => app.id === id)!).filter(Boolean)}
         activeApp={activeWindow}
         minimizedApps={minimizedWindows}
         onAppClick={activateWindow}

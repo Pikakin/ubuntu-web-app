@@ -1,37 +1,50 @@
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import FolderIcon from '@mui/icons-material/Folder';
-import InfoIcon from '@mui/icons-material/Info';
-import SettingsIcon from '@mui/icons-material/Settings';
-import TerminalIcon from '@mui/icons-material/Terminal';
-import { Box, Paper, Typography } from '@mui/material';
-import { styled } from '@mui/material/styles';
 import React from 'react';
+import { Box, Typography, IconButton } from '@mui/material';
+import { styled } from '@mui/material/styles';
+import {
+  Folder as FolderIcon,
+  Terminal as TerminalIcon,
+  Info as InfoIcon,
+  Dashboard as DashboardIcon,
+  MonitorHeart as MonitoringIcon,
+  People as PeopleIcon,
+  Settings as SettingsIcon,
+} from '@mui/icons-material';
 
-const IconContainer = styled(Paper)(({ theme }) => ({
+const IconContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'center',
   padding: theme.spacing(1),
-  width: 80,
-  height: 80,
-  cursor: 'pointer',
-  backgroundColor: 'rgba(255, 255, 255, 0.7)',
-  '&:hover': {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  },
   borderRadius: 8,
-  boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
+  cursor: 'pointer',
+  transition: 'background-color 0.2s',
+  '&:hover': {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  '&:active': {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+}));
+
+const IconWrapper = styled(IconButton)(({ theme }) => ({
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  color: theme.palette.primary.main,
+  width: 64,
+  height: 64,
+  marginBottom: theme.spacing(1),
+  '&:hover': {
+    backgroundColor: 'rgba(255, 255, 255, 1)',
+  },
 }));
 
 const IconLabel = styled(Typography)(({ theme }) => ({
-  marginTop: theme.spacing(0.5),
+  color: 'white',
   fontSize: '0.75rem',
   textAlign: 'center',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-  width: '100%',
+  textShadow: '1px 1px 2px rgba(0, 0, 0, 0.7)',
+  maxWidth: 80,
+  wordWrap: 'break-word',
 }));
 
 interface DesktopIconProps {
@@ -40,30 +53,30 @@ interface DesktopIconProps {
   onClick: () => void;
 }
 
+// 修正: アイコンマッピング関数
 const getIconComponent = (iconName: string) => {
-  switch (iconName) {
-    case 'folder':
-      return <FolderIcon fontSize="large" />;
-    case 'settings':
-      return <SettingsIcon fontSize="large" />;
-    case 'info':
-      return <InfoIcon fontSize="large" />;
-    case 'terminal':
-      return <TerminalIcon fontSize="large" />;
-    case 'dashboard':
-      return <DashboardIcon fontSize="large" />;
-    default:
-      return <FolderIcon fontSize="large" />;
-  }
+  const iconMap: { [key: string]: React.ReactNode } = {
+    folder: <FolderIcon fontSize="large" />,
+    terminal: <TerminalIcon fontSize="large" />,
+    info: <InfoIcon fontSize="large" />,
+    dashboard: <DashboardIcon fontSize="large" />,
+    monitoring: <MonitoringIcon fontSize="large" />,
+    people: <PeopleIcon fontSize="large" />,
+    settings: <SettingsIcon fontSize="large" />,
+  };
+  
+  return iconMap[iconName] || <FolderIcon fontSize="large" />;
 };
 
 const DesktopIcon: React.FC<DesktopIconProps> = ({ title, icon, onClick }) => {
   return (
     <IconContainer onClick={onClick}>
-      <Box sx={{ color: 'primary.main' }}>
+      <IconWrapper>
         {getIconComponent(icon)}
-      </Box>
-      <IconLabel variant="body2">{title}</IconLabel>
+      </IconWrapper>
+      <IconLabel variant="caption">
+        {title}
+      </IconLabel>
     </IconContainer>
   );
 };

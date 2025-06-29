@@ -24,6 +24,7 @@ const LoginContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  padding: theme.spacing(2),
 }));
 
 const LoginForm = styled(Paper)(({ theme }) => ({
@@ -36,6 +37,7 @@ const LoginForm = styled(Paper)(({ theme }) => ({
   borderRadius: 10,
   maxWidth: 400,
   width: '100%',
+  margin: '0 auto',
 }));
 
 const Login: React.FC = () => {
