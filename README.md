@@ -9,6 +9,20 @@ Ubuntu Web OSは、ウェブブラウザからUbuntuサーバーを操作でき�
 * **ファイルエクスプローラー:** ファイルシステムの閲覧、編集、作成、削除
 * **システムダッシュボード:** CPU、メモリ、ディスク使用率などのリアルタイムモニタリング
 * **サービスモニター:** システムサービスの状態確認と管理
+* **Dockerマネージャー:** Dockerコンテナ、イメージ、ネットワーク、ボリューム管理
+  * コンテナの作成、開始、停止、削除
+  * イメージのプル、削除
+  * ネットワークとボリューム管理
+  * リアルタイムログ表示
+  * Docker統計情報の表示
+  * Docker Composeプロジェクト管理
+* **CUDAマネージャー:** NVIDIA GPU・CUDA環境の管理
+  * GPU情報表示（型番、メモリ、ドライバー等）
+  * リアルタイムGPU監視（使用率、温度、電力等）
+  * CUDA Toolkitバージョン管理
+  * cuDNNバージョン管理
+  * CUDA環境変数設定
+  * CUDAテスト実行
 * **認証システム:** JWTベースのセキュアなログインと認証
 
 ## 技術スタック
@@ -35,6 +49,8 @@ Ubuntu Web OSは、ウェブブラウザからUbuntuサーバーを操作でき�
 * Go 1.22以上
 * Node.js 23以上
 * npm または yarn
+* Docker（Dockerマネージャー機能を使用する場合）
+* Docker Compose（Composeプロジェクト管理を使用する場合）
 * Ubuntuサーバー（推奨: Ubuntu 20.04 LTS以上）
 
 ### バックエンドのセットアップ
@@ -95,6 +111,7 @@ ubuntu-web-app/
 ├── backend/
 │   ├── handlers/     # APIハンドラー
 │   │   ├── auth.go       # 認証関連
+│   │   ├── docker.go     # Docker管理
 │   │   ├── files.go      # ファイル操作
 │   │   ├── services.go   # システムサービス
 │   │   ├── system.go     # システム情報
@@ -109,6 +126,7 @@ ubuntu-web-app/
 │   │   ├── components/   # Reactコンポーネント
 │   │   │   ├── Dashboard.tsx     # システムダッシュボード
 │   │   │   ├── Desktop.tsx       # デスクトップ環境
+│   │   │   ├── DockerManager.tsx # Dockerマネージャー
 │   │   │   ├── FileExplorer.tsx  # ファイルエクスプローラー
 │   │   │   ├── Login.tsx         # ログイン画面
 │   │   │   ├── ServiceMonitor.tsx # サービスモニター
@@ -148,9 +166,38 @@ ubuntu-web-app/
   * `GET /api/service/:service` - 特定サービスの状態取得
   * `POST /api/service/control` - サービスの開始/停止/再起動
 
+* **Docker管理**
+  * `GET /api/docker/containers` - コンテナ一覧の取得
+  * `GET /api/docker/containers/:id` - 特定コンテナの詳細取得
+  * `POST /api/docker/containers/:id/start` - コンテナ開始
+  * `POST /api/docker/containers/:id/stop` - コンテナ停止
+  * `POST /api/docker/containers/:id/restart` - コンテナ再起動
+  * `DELETE /api/docker/containers/:id` - コンテナ削除
+  * `GET /api/docker/containers/:id/logs` - コンテナログ取得
+  * `POST /api/docker/containers` - コンテナ作成
+  * `GET /api/docker/images` - イメージ一覧の取得
+  * `POST /api/docker/images/pull` - イメージプル
+  * `DELETE /api/docker/images/:id` - イメージ削除
+  * `GET /api/docker/networks` - ネットワーク一覧の取得
+  * `POST /api/docker/networks` - ネットワーク作成
+  * `DELETE /api/docker/networks/:id` - ネットワーク削除
+  * `GET /api/docker/volumes` - ボリューム一覧の取得
+  * `POST /api/docker/volumes` - ボリューム作成
+  * `DELETE /api/docker/volumes/:name` - ボリューム削除
+  * `GET /api/docker/stats` - コンテナ統計情報の取得
+  * `GET /api/docker/info` - Docker情報の取得
+  * `POST /api/docker/cleanup` - 未使用リソースのクリーンアップ
+  * `GET /api/docker/compose/projects` - Docker Composeプロジェクト一覧
+  * `GET /api/docker/compose/project` - プロジェクト詳細の取得
+  * `POST /api/docker/compose/project` - プロジェクト保存
+  * `POST /api/docker/compose/up` - プロジェクト開始
+  * `POST /api/docker/compose/down` - プロジェクト停止
+  * `POST /api/docker/compose/restart` - プロジェクト再起動
+
 * **WebSocket**
   * `GET /api/ws` - WebSocket接続（一般用）
   * `GET /api/terminal` - ターミナル専用WebSocket接続（PTY統合）
+  * `GET /api/docker/containers/:id/logs/stream` - コンテナログストリーミング
 
 ## ライセンス
 

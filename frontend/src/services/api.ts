@@ -238,3 +238,284 @@ export const saveFileContent = async (path: string, content: string) => {
     throw error;
   }
 };
+
+// CUDA関連API
+export const getCUDAInfo = async () => {
+  try {
+    const response = await apiClient.get('/cuda/gpu-info');
+    return response.data;
+  } catch (error) {
+    console.error('Error getting CUDA info:', error);
+    throw error;
+  }
+};
+
+export const getCUDAToolkitInfo = async () => {
+  try {
+    const response = await apiClient.get('/cuda/toolkit-info');
+    return response.data;
+  } catch (error) {
+    console.error('Error getting CUDA toolkit info:', error);
+    throw error;
+  }
+};
+
+export const getCuDNNInfo = async () => {
+  try {
+    const response = await apiClient.get('/cuda/cudnn-info');
+    return response.data;
+  } catch (error) {
+    console.error('Error getting cuDNN info:', error);
+    throw error;
+  }
+};
+
+export const getCUDAEnvironment = async () => {
+  try {
+    const response = await apiClient.get('/cuda/environment');
+    return response.data;
+  } catch (error) {
+    console.error('Error getting CUDA environment:', error);
+    throw error;
+  }
+};
+
+export const setCUDAEnvironment = async (environment: any) => {
+  try {
+    const response = await apiClient.post('/cuda/environment', environment);
+    return response.data;
+  } catch (error) {
+    console.error('Error setting CUDA environment:', error);
+    throw error;
+  }
+};
+
+export const runCUDATest = async (testType: string) => {
+  try {
+    const response = await apiClient.post('/cuda/test', { test_type: testType });
+    return response.data;
+  } catch (error) {
+    console.error('Error running CUDA test:', error);
+    throw error;
+  }
+};
+
+// GPU統計のWebSocketコネクション
+export const connectGPUStatsWebSocket = (): WebSocket => {
+  const token = getAuthToken();
+  const ws = new WebSocket(`ws://localhost:8080/api/cuda/gpu-stats/stream?token=${token}`);
+  
+  ws.onopen = () => {
+    console.log('GPU Stats WebSocket connection established');
+  };
+  
+  ws.onclose = () => {
+    console.log('GPU Stats WebSocket connection closed');
+  };
+  
+  ws.onerror = (error) => {
+    console.error('GPU Stats WebSocket error:', error);
+  };
+  
+  return ws;
+};
+
+// Python関連API
+export const getPythonVersions = async () => {
+  try {
+    const response = await apiClient.get('/python/versions');
+    return response.data;
+  } catch (error) {
+    console.error('Error getting Python versions:', error);
+    throw error;
+  }
+};
+
+export const getVirtualEnvironments = async () => {
+  try {
+    const response = await apiClient.get('/python/environments');
+    return response.data;
+  } catch (error) {
+    console.error('Error getting virtual environments:', error);
+    throw error;
+  }
+};
+
+export const createVirtualEnvironment = async (name: string, pythonPath: string, type: string) => {
+  try {
+    const response = await apiClient.post('/python/environments', {
+      name,
+      python_path: pythonPath,
+      type
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating virtual environment:', error);
+    throw error;
+  }
+};
+
+export const deleteVirtualEnvironment = async (name: string, type: string, path?: string) => {
+  try {
+    const response = await apiClient.delete('/python/environments', {
+      data: { name, type },
+      params: path ? { path } : {}
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting virtual environment:', error);
+    throw error;
+  }
+};
+
+export const getPackages = async (envPath: string, envName: string, envType: string) => {
+  try {
+    const response = await apiClient.get('/python/packages', {
+      params: {
+        env_path: envPath,
+        env_name: envName,
+        env_type: envType
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error getting packages:', error);
+    throw error;
+  }
+};
+
+export const installPackage = async (envPath: string, envName: string, envType: string, packageName: string, version?: string) => {
+  try {
+    const response = await apiClient.post('/python/packages/install', {
+      env_path: envPath,
+      env_name: envName,
+      env_type: envType,
+      package_name: packageName,
+      version
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error installing package:', error);
+    throw error;
+  }
+};
+
+export const uninstallPackage = async (envPath: string, envName: string, envType: string, packageName: string) => {
+  try {
+    const response = await apiClient.delete('/python/packages', {
+      data: {
+        env_path: envPath,
+        env_name: envName,
+        env_type: envType,
+        package_name: packageName
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error uninstalling package:', error);
+    throw error;
+  }
+};
+
+export const generateRequirements = async (envPath: string, envName: string, envType: string) => {
+  try {
+    const response = await apiClient.get('/python/requirements', {
+      params: {
+        env_path: envPath,
+        env_name: envName,
+        env_type: envType
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error generating requirements:', error);
+    throw error;
+  }
+};
+
+export const installRequirements = async (envPath: string, envName: string, envType: string, requirements: string) => {
+  try {
+    const response = await apiClient.post('/python/requirements/install', {
+      env_path: envPath,
+      env_name: envName,
+      env_type: envType,
+      requirements
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error installing requirements:', error);
+    throw error;
+  }
+};
+
+export const searchPackages = async (query: string) => {
+  try {
+    const response = await apiClient.get('/python/packages/search', {
+      params: { q: query }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error searching packages:', error);
+    throw error;
+  }
+};
+
+// System Resources API
+export const getSystemResources = async () => {
+  try {
+    const response = await apiClient.get('/resources');
+    return response.data;
+  } catch (error) {
+    console.error('Error getting system resources:', error);
+    throw error;
+  }
+};
+
+export const killProcess = async (pid: number, signal: string = 'TERM') => {
+  try {
+    const response = await apiClient.post('/resources/kill', {
+      pid,
+      signal
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error killing process:', error);
+    throw error;
+  }
+};
+
+export const changeProcessPriority = async (pid: number, priority: number) => {
+  try {
+    const response = await apiClient.post('/resources/priority', {
+      pid,
+      priority
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error changing process priority:', error);
+    throw error;
+  }
+};
+
+// System Resources WebSocket connection
+export const connectSystemResourcesWebSocket = (): WebSocket => {
+  const token = getAuthToken();
+  const ws = new WebSocket(`ws://localhost:8080/api/resources/stream?token=${token}`);
+  
+  ws.onopen = () => {
+    console.log('System Resources WebSocket connection established');
+  };
+  
+  ws.onclose = () => {
+    console.log('System Resources WebSocket connection closed');
+  };
+  
+  ws.onerror = (error) => {
+    console.error('System Resources WebSocket error:', error);
+  };
+  
+  return ws;
+};
+
+// Export the apiClient as 'api' for use in components
+export const api = apiClient;

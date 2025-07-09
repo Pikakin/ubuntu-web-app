@@ -6,6 +6,10 @@ import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import SearchIcon from '@mui/icons-material/Search';
 import SettingsIcon from '@mui/icons-material/Settings';
 import TerminalIcon from '@mui/icons-material/Terminal';
+import DeveloperBoardIcon from '@mui/icons-material/DeveloperBoard';
+import ComputerIcon from '@mui/icons-material/Computer';
+import PythonIcon from '@mui/icons-material/DataObject';
+import MonitoringIcon from '@mui/icons-material/Monitor';
 import { 
   Avatar, 
   Box, 
@@ -103,6 +107,14 @@ const getIconComponent = (iconName: string) => {
       return <TerminalIcon fontSize="large" />;
     case 'dashboard':
       return <DashboardIcon fontSize="large" />;
+    case 'docker':
+      return <DeveloperBoardIcon fontSize="large" />;
+    case 'cuda':
+      return <ComputerIcon fontSize="large" />;
+    case 'python':
+      return <PythonIcon fontSize="large" />;
+    case 'monitoring':
+      return <MonitoringIcon fontSize="large" />;
     default:
       return <FolderIcon fontSize="large" />;
   }

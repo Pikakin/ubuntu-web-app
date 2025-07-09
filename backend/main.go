@@ -51,6 +51,71 @@ func main() {
 		authorized.POST("/files/directory", handlers.CreateDirectory)
 		authorized.DELETE("/files", handlers.DeleteFile)
 		
+		// Docker関連
+		authorized.GET("/docker/containers", handlers.ListContainers)
+		authorized.GET("/docker/containers/:id", handlers.GetContainer)
+		authorized.POST("/docker/containers/:id/start", handlers.StartContainer)
+		authorized.POST("/docker/containers/:id/stop", handlers.StopContainer)
+		authorized.POST("/docker/containers/:id/restart", handlers.RestartContainer)
+		authorized.DELETE("/docker/containers/:id", handlers.DeleteContainer)
+		authorized.GET("/docker/containers/:id/logs", handlers.GetContainerLogs)
+		authorized.POST("/docker/containers", handlers.CreateContainer)
+		
+		authorized.GET("/docker/images", handlers.ListImages)
+		authorized.POST("/docker/images/pull", handlers.PullImage)
+		authorized.DELETE("/docker/images/:id", handlers.DeleteImage)
+		
+		authorized.GET("/docker/networks", handlers.ListNetworks)
+		authorized.POST("/docker/networks", handlers.CreateNetwork)
+		authorized.DELETE("/docker/networks/:id", handlers.DeleteNetwork)
+		
+		authorized.GET("/docker/volumes", handlers.ListVolumes)
+		authorized.POST("/docker/volumes", handlers.CreateVolume)
+		authorized.DELETE("/docker/volumes/:name", handlers.DeleteVolume)
+		
+		authorized.GET("/docker/stats", handlers.GetContainerStats)
+		authorized.GET("/docker/info", handlers.GetDockerInfo)
+		authorized.GET("/docker/version", handlers.GetDockerVersion)
+		authorized.POST("/docker/cleanup", handlers.DockerCleanup)
+		
+		authorized.GET("/docker/compose/projects", handlers.ListDockerComposeProjects)
+		authorized.GET("/docker/compose/project", handlers.GetDockerComposeProject)
+		authorized.POST("/docker/compose/project", handlers.SaveDockerComposeProject)
+		authorized.POST("/docker/compose/up", handlers.DockerComposeUp)
+		authorized.POST("/docker/compose/down", handlers.DockerComposeDown)
+		authorized.POST("/docker/compose/restart", handlers.DockerComposeRestart)
+		
+		// CUDA関連
+		authorized.GET("/cuda/gpu-info", handlers.GetGPUInfo)
+		authorized.GET("/cuda/toolkit-info", handlers.GetCUDAToolkitInfo)
+		authorized.GET("/cuda/cudnn-info", handlers.GetCuDNNInfo)
+		authorized.GET("/cuda/environment", handlers.GetCUDAEnvironment)
+		authorized.POST("/cuda/environment", handlers.SetCUDAEnvironment)
+		authorized.POST("/cuda/test", handlers.RunCUDATest)
+		
+		// Python関連
+		authorized.GET("/python/versions", handlers.GetPythonVersions)
+		authorized.GET("/python/environments", handlers.GetVirtualEnvironments)
+		authorized.POST("/python/environments", handlers.CreateVirtualEnvironment)
+		authorized.DELETE("/python/environments", handlers.DeleteVirtualEnvironment)
+		authorized.GET("/python/packages", handlers.GetPackages)
+		authorized.POST("/python/packages/install", handlers.InstallPackage)
+		authorized.DELETE("/python/packages", handlers.UninstallPackage)
+		authorized.GET("/python/requirements", handlers.GenerateRequirements)
+		authorized.POST("/python/requirements/install", handlers.InstallRequirements)
+		authorized.GET("/python/packages/search", handlers.SearchPackages)
+		
+		// System Resources関連
+		authorized.GET("/resources", handlers.GetSystemResources)
+		authorized.POST("/resources/kill", handlers.KillProcess)
+		authorized.POST("/resources/priority", handlers.SetProcessPriority)
+		authorized.GET("/resources/info", handlers.GetDetailedSystemInfo)
+		
+		// APT Package管理関連
+		authorized.GET("/packages", handlers.ListInstalledPackages)
+		authorized.GET("/packages/search", handlers.SearchAPTPackages)
+		authorized.POST("/packages/install", handlers.InstallAPTPackage)
+		
 		// WebSocket
 		authorized.GET("/ws", handleWebSocket)
 	}
@@ -71,6 +136,9 @@ func main() {
 	terminalGroup.Use(handlers.VerifyTokenFromQuery)
 	{
 		terminalGroup.GET("/terminal", handlers.HandleTerminalSession)
+		terminalGroup.GET("/docker/containers/:id/logs/stream", handlers.StreamContainerLogs)
+		terminalGroup.GET("/cuda/gpu-stats/stream", handlers.StreamGPUStats)
+		// terminalGroup.GET("/resources/stream", handlers.StreamSystemResources) // TODO: Implement
 	}
 
 	// 静的ファイルの提供 (Reactビルド後のファイル)

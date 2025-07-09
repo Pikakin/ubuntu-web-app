@@ -9,6 +9,9 @@ import {
   MonitorHeart as MonitoringIcon,
   People as PeopleIcon,
   Settings as SettingsIcon,
+  DeveloperBoard as DockerIcon,
+  Computer as CudaIcon,
+  DataObject as PythonIcon,
 } from '@mui/icons-material';
 
 const IconContainer = styled(Box)(({ theme }) => ({
@@ -63,6 +66,9 @@ const getIconComponent = (iconName: string) => {
     monitoring: <MonitoringIcon fontSize="large" />,
     people: <PeopleIcon fontSize="large" />,
     settings: <SettingsIcon fontSize="large" />,
+    docker: <DockerIcon fontSize="large" />,
+    cuda: <CudaIcon fontSize="large" />,
+    python: <PythonIcon fontSize="large" />,
   };
   
   return iconMap[iconName] || <FolderIcon fontSize="large" />;

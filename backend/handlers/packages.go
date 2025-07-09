@@ -21,8 +21,8 @@ func ListInstalledPackages(c *gin.Context) {
 	})
 }
 
-// SearchPackages searches for packages in repositories
-func SearchPackages(c *gin.Context) {
+// SearchAPTPackages searches for packages in repositories
+func SearchAPTPackages(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query is required"})
@@ -41,8 +41,8 @@ func SearchPackages(c *gin.Context) {
 	})
 }
 
-// InstallPackage installs a package
-func InstallPackage(c *gin.Context) {
+// InstallAPTPackage installs a package
+func InstallAPTPackage(c *gin.Context) {
 	var request struct {
 		Package string `json:"package"`
 	}
